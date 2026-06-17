@@ -12,6 +12,7 @@ import { configHandler } from "./commands/config.js";
 import { prWorktreeHandler } from "./commands/pr.js";
 import { openWorktreeHandler } from "./commands/open.js";
 import { extractWorktreeHandler } from "./commands/extract.js";
+import { cdWorktreeHandler } from "./commands/cd.js";
 
 const program = new Command();
 
@@ -148,6 +149,14 @@ program
   )
   .description("Open an existing worktree in the editor.")
   .action(openWorktreeHandler);
+
+program
+  .command("cd")
+  .argument("[pathOrBranch]", "Path to worktree or branch name to navigate to")
+  .description(
+    "Resolve a worktree and copy a 'cd' command to the clipboard for quick navigation."
+  )
+  .action(cdWorktreeHandler);
 
 program
   .command("extract")

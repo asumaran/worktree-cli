@@ -1,6 +1,8 @@
-# @johnlindquist/worktree
+# @asumaran/worktree
 
-A CLI tool for managing Git worktrees with a focus on opening them in the Cursor editor.
+A CLI tool for managing Git worktrees and opening them in your editor of choice.
+
+> This is a fork of [@johnlindquist/worktree](https://github.com/johnlindquist/worktree-cli) with additional features and fixes.
 
 ## Features
 
@@ -13,8 +15,18 @@ A CLI tool for managing Git worktrees with a focus on opening them in the Cursor
 
 ## Installation
 
+Install directly from GitHub (no registry needed). The package is compiled on
+install via the `prepare` script:
+
 ```bash
-pnpm install -g @johnlindquist/worktree
+pnpm add -g github:asumaran/worktree-cli
+```
+
+To update later, run the same command again. You can also pin to a branch, tag
+or commit:
+
+```bash
+pnpm add -g github:asumaran/worktree-cli#main
 ```
 
 ## Usage
@@ -116,6 +128,27 @@ Example:
 wt open                    # Interactive selection
 wt open feature/login      # Open by branch name
 wt open ./path/to/worktree # Open by path
+```
+
+### Navigate to a worktree
+
+```bash
+wt cd [pathOrBranch]
+```
+
+Since a child process cannot change the parent shell's directory, `wt cd`
+resolves the target worktree and copies a `cd /path/to/worktree` command to the
+clipboard. Paste it (Cmd+V on macOS, Ctrl+V elsewhere) and press Enter to
+navigate.
+
+**Interactive Selection**: Run `wt cd` without arguments to pick from a
+fuzzy-searchable list of worktrees.
+
+Example:
+```bash
+wt cd                    # Interactive selection
+wt cd feature/login      # Resolve by branch name
+wt cd ./path/to/worktree # Resolve by path
 ```
 
 ### List worktrees

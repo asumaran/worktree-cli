@@ -1,9 +1,9 @@
 {
-	"name": "@johnlindquist/worktree",
-	"version": "0.0.0-development",
+	"name": "@asumaran/worktree",
+	"version": "1.0.0",
 	"packageManager": "pnpm@9.5.0",
-	"description": "A CLI tool for managing Git worktrees with a focus on opening them in the Cursor editor.",
-	"author": "John Lindquist <johnlindquist@gmail.com>",
+	"description": "A CLI tool for managing Git worktrees and opening them in your editor of choice.",
+	"author": "Alfredo Sumaran <a.sumaran@gmail.com>",
 	"license": "MIT",
 	"type": "module",
 	"bin": {
@@ -12,10 +12,10 @@
 	"scripts": {
 		"build": "tsc",
 		"postbuild": "node -e \"const fs = require('fs'); try { fs.chmodSync('build/index.js', 0o755); } catch (e) { if (process.platform !== 'win32') throw e; }\"",
+		"prepare": "npm run build",
 		"start": "node build/index.js",
 		"dev": "tsc -w",
-		"test": "vitest run",
-		"semantic-release": "semantic-release"
+		"test": "vitest run"
 	},
 	"dependencies": {
 		"chalk": "^5.2.0",
@@ -26,31 +26,11 @@
 		"prompts": "^2.4.2"
 	},
 	"devDependencies": {
-		"@semantic-release/changelog": "^6.0.3",
-		"@semantic-release/commit-analyzer": "^11.1.0",
-		"@semantic-release/github": "^9.2.6",
-		"@semantic-release/npm": "^11.0.2",
-		"@semantic-release/release-notes-generator": "^12.1.0",
 		"@types/node": "^18.0.0",
 		"@types/prompts": "^2.4.9",
 		"@vitest/coverage-v8": "^3.1.1",
-		"semantic-release": "^23.0.2",
 		"typescript": "^5.0.2",
 		"vitest": "^3.1.1"
-	},
-	"release": {
-		"branches": [
-			"main"
-		],
-		"plugins": [
-			"@semantic-release/commit-analyzer",
-			"@semantic-release/release-notes-generator",
-			"@semantic-release/npm",
-			"@semantic-release/github"
-		]
-	},
-	"publishConfig": {
-		"access": "public"
 	},
 	"files": [
 		"build"
