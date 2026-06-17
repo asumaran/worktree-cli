@@ -15,8 +15,8 @@ A CLI tool for managing Git worktrees and opening them in your editor of choice.
 
 ## Installation
 
-Install directly from GitHub (no registry needed). The package is compiled on
-install via the `prepare` script:
+Install directly from GitHub (no registry needed). The compiled output in
+`build/` is committed, so no build step runs on install:
 
 ```bash
 pnpm add -g github:asumaran/worktree-cli
@@ -28,6 +28,9 @@ or commit:
 ```bash
 pnpm add -g github:asumaran/worktree-cli#main
 ```
+
+> When changing the source, run `pnpm build` and commit the updated `build/`
+> output so installs pick up the change.
 
 ## Usage
 
