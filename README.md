@@ -15,22 +15,33 @@ A CLI tool for managing Git worktrees and opening them in your editor of choice.
 
 ## Installation
 
-Install directly from GitHub (no registry needed). The compiled output in
-`build/` is committed, so no build step runs on install:
+Install the latest GitHub Release (no npm registry needed). Each release ships a
+prebuilt tarball as an asset, so nothing is compiled on install. This requires
+the [GitHub CLI](https://cli.github.com/) (`gh`):
 
 ```bash
-pnpm add -g github:asumaran/worktree-cli
+tmp=$(mktemp -d)
+gh release download -R asumaran/worktree-cli --pattern '*.tgz' --dir "$tmp"
+pnpm add -g "$tmp"/*.tgz
+rm -rf "$tmp"
 ```
 
-To update later, run the same command again. You can also pin to a branch, tag
-or commit:
+To update later, run the same commands again (they always fetch the latest
+release). To install a specific version, pass the tag to `gh release download`,
+e.g. `gh release download v1.0.0 ...`.
+
+## Releasing
+
+Releases are created manually. A GitHub Actions workflow then builds the project,
+packs a tarball whose version matches the tag, and attaches it to the release:
 
 ```bash
-pnpm add -g github:asumaran/worktree-cli#main
+pnpm build && pnpm test   # sanity check locally
+gh release create v1.1.0 --generate-notes
 ```
 
-> When changing the source, run `pnpm build` and commit the updated `build/`
-> output so installs pick up the change.
+The `build/` directory is not committed; it is produced in CI and shipped only
+as the release tarball.
 
 ## Usage
 
