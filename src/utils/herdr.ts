@@ -1,6 +1,29 @@
 import { execa } from "execa";
 import chalk from "chalk";
+import { dirname } from "node:path";
 import { isHerdrIntegrationEnabled } from "../config.js";
+
+/**
+ * Resolve the main repository root (the parent worktree).
+ *
+ * herdr's "open worktree" action must start from the repo's parent workspace,
+ * so we pass it as --cwd. `--git-common-dir` points at the shared `.git` of the
+ * main worktree even when invoked from a linked worktree, so its parent is the
+ * main repo root regardless of where `wt` runs.
+ */
+async function getMainRepoRoot(): Promise<string | undefined> {
+    try {
+        const { stdout } = await execa("git", [
+            "rev-parse",
+            "--path-format=absolute",
+            "--git-common-dir",
+        ]);
+        const commonDir = stdout.trim();
+        return commonDir ? dirname(commonDir) : undefined;
+    } catch {
+        return undefined;
+    }
+}
 
 /**
  * Register a worktree in the herdr sidebar.
@@ -22,7 +45,16 @@ export async function openInHerdr(worktreePath: string): Promise<void> {
     }
 
     try {
-        await execa("herdr", ["worktree", "open", "--path", worktreePath, "--focus"]);
+        const args = ["worktree", "open"];
+        // herdr talks to its server over a socket and does not inherit the CLI's
+        // cwd, so the repo context must be passed explicitly.
+        const repoRoot = await getMainRepoRoot();
+        if (repoRoot) {
+            args.push("--cwd", repoRoot);
+        }
+        args.push("--path", worktreePath, "--focus");
+
+        await execa("herdr", args);
     } catch (error: any) {
         // herdr isn't installed at all: stay silent so users without herdr
         // never see noise on every worktree creation.
