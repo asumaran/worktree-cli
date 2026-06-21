@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { getDefaultEditor, setDefaultEditor, getGitProvider, setGitProvider, getConfigPath, getDefaultWorktreePath, setDefaultWorktreePath, clearDefaultWorktreePath } from '../config.js';
+import { getDefaultEditor, setDefaultEditor, getGitProvider, setGitProvider, getConfigPath, getDefaultWorktreePath, setDefaultWorktreePath, clearDefaultWorktreePath, isHerdrIntegrationEnabled, setHerdrIntegration } from '../config.js';
 
 export async function configHandler(action: 'get' | 'set' | 'path' | 'clear', key?: string, value?: string) {
     try {
@@ -18,9 +18,12 @@ export async function configHandler(action: 'get' | 'set' | 'path' | 'clear', ke
                     } else {
                         console.log(chalk.blue(`Default worktree path is not set (using sibling directory behavior).`));
                     }
+                } else if (key === 'herdr') {
+                    const enabled = isHerdrIntegrationEnabled();
+                    console.log(chalk.blue(`herdr integration is currently: ${chalk.bold(enabled ? 'on' : 'off')}`));
                 } else {
                     console.error(chalk.red(`Unknown configuration key to get: ${key}`));
-                    console.error(chalk.yellow(`Available keys: editor, provider, worktreepath`));
+                    console.error(chalk.yellow(`Available keys: editor, provider, worktreepath, herdr`));
                     process.exit(1);
                 }
                 break;
@@ -40,6 +43,18 @@ export async function configHandler(action: 'get' | 'set' | 'path' | 'clear', ke
                     setDefaultWorktreePath(value);
                     const resolvedPath = getDefaultWorktreePath();
                     console.log(chalk.green(`Default worktree path set to: ${chalk.bold(resolvedPath)}`));
+                } else if (key === 'herdr' && value) {
+                    const normalized = value.toLowerCase();
+                    const truthy = ['on', 'true', 'enable', 'enabled', 'yes'];
+                    const falsy = ['off', 'false', 'disable', 'disabled', 'no'];
+                    if (!truthy.includes(normalized) && !falsy.includes(normalized)) {
+                        console.error(chalk.red(`Invalid value for herdr: ${value}`));
+                        console.error(chalk.yellow(`Valid values: on, off`));
+                        process.exit(1);
+                    }
+                    const enabled = truthy.includes(normalized);
+                    setHerdrIntegration(enabled);
+                    console.log(chalk.green(`herdr integration set to: ${chalk.bold(enabled ? 'on' : 'off')}`));
                 } else if (key === 'editor') {
                     console.error(chalk.red(`You must provide an editor name.`));
                     process.exit(1);
@@ -49,9 +64,12 @@ export async function configHandler(action: 'get' | 'set' | 'path' | 'clear', ke
                 } else if (key === 'worktreepath') {
                     console.error(chalk.red(`You must provide a path.`));
                     process.exit(1);
+                } else if (key === 'herdr') {
+                    console.error(chalk.red(`You must provide a value (on or off).`));
+                    process.exit(1);
                 } else {
                     console.error(chalk.red(`Unknown configuration key to set: ${key}`));
-                    console.error(chalk.yellow(`Available keys: editor, provider, worktreepath`));
+                    console.error(chalk.yellow(`Available keys: editor, provider, worktreepath, herdr`));
                     process.exit(1);
                 }
                 break;

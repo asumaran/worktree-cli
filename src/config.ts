@@ -14,6 +14,7 @@ interface ConfigSchema {
     defaultEditor: string;
     gitProvider: 'gh' | 'glab';
     defaultWorktreePath?: string;
+    herdrIntegration: boolean;
 }
 
 // Initialize conf with a schema and project name
@@ -32,11 +33,24 @@ const schema = {
         type: 'string',
         // No default - falls back to sibling directory behavior when not set
     },
+    herdrIntegration: {
+        type: 'boolean',
+        // Default on: register newly created worktrees in herdr's sidebar when
+        // the `herdr` CLI is available. No-op when herdr isn't installed.
+        default: true,
+    },
 } as const;
+
+// Allow tests (and advanced users) to redirect the config store to an isolated
+// directory. `conf` resolves to the OS config dir by default, which on macOS
+// ignores XDG_CONFIG_HOME, so this env var is the reliable way to keep test
+// runs from touching the real user config.
+const configCwd = process.env.WT_CONFIG_DIR;
 
 const config = new Conf<ConfigSchema>({
     projectName: packageName, // Use the actual package name
     schema,
+    ...(configCwd ? { cwd: configCwd } : {}),
 });
 
 // Function to get the default editor
@@ -94,4 +108,14 @@ export function setDefaultWorktreePath(worktreePath: string): void {
 // Function to clear the default worktree path
 export function clearDefaultWorktreePath(): void {
     config.delete('defaultWorktreePath');
-} 
+}
+
+// Function to check whether the herdr integration is enabled
+export function isHerdrIntegrationEnabled(): boolean {
+    return config.get('herdrIntegration');
+}
+
+// Function to enable or disable the herdr integration
+export function setHerdrIntegration(enabled: boolean): void {
+    config.set('herdrIntegration', enabled);
+}

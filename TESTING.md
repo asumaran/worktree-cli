@@ -87,6 +87,39 @@
 2. Check the Actions tab in your GitHub repository to see that the "Publish to npm" workflow runs successfully.
 3. Verify that the package is published to npm with the expected version (0.0.0-development) without any new commits from the workflow.
 
+## Manual Test for `wt path`
+
+1. Configure a global worktree directory:
+   ```bash
+   wt config set worktreepath ~/wt
+   ```
+2. In a test repository, print the resolved path:
+   ```bash
+   wt path feature/login
+   ```
+   Verify it prints `~/wt/<repoName>/feature-login` and creates nothing.
+3. Confirm only the path is on stdout (capturable):
+   ```bash
+   DIR="$(wt path feature/login)"; echo "[$DIR]"
+   ```
+4. Run it outside a git repo and confirm it exits non-zero with an error on stderr.
+
+## Manual Test for herdr Integration
+
+1. With the `herdr` CLI installed and its server running, create a worktree:
+   ```bash
+   wt new feature/herdr-test
+   ```
+   Verify the worktree appears in the herdr sidebar and gets focused.
+2. Disable the integration and create another worktree:
+   ```bash
+   wt config set herdr off
+   wt new feature/no-herdr
+   ```
+   Verify nothing is sent to herdr.
+3. Without `herdr` on PATH (or with `herdr` enabled but server stopped), confirm
+   `wt new` still completes successfully (best-effort, no failure).
+
 ## Important Notes
 
 - The CI workflow will not make any commits or version bumps

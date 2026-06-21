@@ -165,6 +165,34 @@ wt cd feature/login      # Resolve by branch name
 wt cd ./path/to/worktree # Resolve by path
 ```
 
+### Print a worktree path
+
+```bash
+wt path <branchName>
+```
+
+Resolves and prints the absolute path where `wt new <branchName>` would create
+its worktree, **without creating anything**. It uses the exact same resolution
+(`defaultWorktreePath` + repo namespace + branch sanitization), so other tools
+can agree on where a branch's worktree lives.
+
+Only the path is written to stdout, so it is safe to capture in scripts:
+
+```bash
+# With a global worktree directory configured (e.g. ~/wt)
+wt path feature/login
+# -> /Users/me/wt/myrepo/feature-login
+
+# Capture it
+DIR="$(wt path feature/login)"
+
+# Resolve from another repository
+wt path feature/login --cwd /path/to/other-repo
+```
+
+Exits non-zero (with the error on stderr) when run outside a git repository or
+when the branch name is missing or invalid.
+
 ### List worktrees
 
 ```bash
@@ -339,6 +367,30 @@ Branch names with slashes are converted to dashes for directory names:
 - `hotfix/urgent-fix` → `hotfix-urgent-fix`
 
 This ensures uniqueness: `feature/auth` and `hotfix/auth` create different directories.
+
+### herdr Integration
+
+When you create (or reuse) a worktree with `wt new`/`wt setup`, `wt` registers
+it in the [herdr](https://herdr.dev) sidebar and focuses it, by running:
+
+```bash
+herdr worktree open --path <worktree> --focus
+```
+
+This is **best-effort**: it only runs when the `herdr` CLI is installed, and any
+failure (herdr not installed, server not running, etc.) is ignored silently so
+it never blocks worktree creation. It is enabled by default.
+
+```bash
+# Disable the integration
+wt config set herdr off
+
+# Re-enable it
+wt config set herdr on
+
+# Check the current state
+wt config get herdr
+```
 
 ### Setup Worktree Configuration
 

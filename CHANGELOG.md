@@ -1,3 +1,14 @@
+## v1.1.0 (2026-06-21)
+
+### Features
+
+* **path:** add `wt path <branch>` to print the resolved worktree path without creating anything, so other tools can agree on worktree locations.
+* **herdr:** register newly created/reused worktrees in the [herdr](https://herdr.dev) sidebar via `herdr worktree open --path <path> --focus`. Best-effort and no-op when herdr isn't installed. Toggle with `wt config set herdr <on|off>`.
+
+### Bug Fixes
+
+* **config:** honor `WT_CONFIG_DIR` to isolate the config store, so test runs no longer clobber the real user config on macOS (where `conf` ignores `XDG_CONFIG_HOME`).
+
 ## [2.0.2](https://github.com/johnlindquist/worktree-cli/compare/v2.0.1...v2.0.2) (2025-03-20)
 
 

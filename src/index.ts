@@ -2,6 +2,9 @@
 
 import { Command } from "commander";
 import chalk from "chalk";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import { newWorktreeHandler } from "./commands/new.js";
 import { setupWorktreeHandler } from "./commands/setup.js";
 import { listWorktreesHandler } from "./commands/list.js";
@@ -13,13 +16,21 @@ import { prWorktreeHandler } from "./commands/pr.js";
 import { openWorktreeHandler } from "./commands/open.js";
 import { extractWorktreeHandler } from "./commands/extract.js";
 import { cdWorktreeHandler } from "./commands/cd.js";
+import { pathWorktreeHandler } from "./commands/path.js";
+
+// Read the version from package.json so `wt --version` always matches the
+// published release (CI sets the package version from the release tag).
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const packageJson = JSON.parse(
+  fs.readFileSync(path.resolve(__dirname, "../package.json"), "utf8")
+);
 
 const program = new Command();
 
 program
   .name("wt")
   .description("Manage git worktrees and open them in the Cursor editor.")
-  .version("1.0.0");
+  .version(packageJson.version);
 
 program
   .command("new")
@@ -151,6 +162,18 @@ program
   .action(openWorktreeHandler);
 
 program
+  .command("path")
+  .argument("<branchName>", "Branch name to resolve the worktree path for")
+  .option(
+    "--cwd <cwd>",
+    "Directory used to locate the repository (defaults to the current directory)"
+  )
+  .description(
+    "Print the absolute worktree path for a branch without creating anything."
+  )
+  .action(pathWorktreeHandler);
+
+program
   .command("cd")
   .argument("[pathOrBranch]", "Path to worktree or branch name to navigate to")
   .description(
@@ -208,6 +231,15 @@ program
           .description("Set the default directory for new worktrees.")
           .action((worktreePath) => configHandler("set", "worktreepath", worktreePath))
       )
+      .addCommand(
+        new Command("herdr")
+          .argument(
+            "<state>",
+            "Whether to register new worktrees in herdr's sidebar (on or off)"
+          )
+          .description("Enable or disable the herdr integration.")
+          .action((state) => configHandler("set", "herdr", state))
+      )
   )
   .addCommand(
     new Command("get")
@@ -226,6 +258,11 @@ program
         new Command("worktreepath")
           .description("Get the currently configured default worktree directory.")
           .action(() => configHandler("get", "worktreepath"))
+      )
+      .addCommand(
+        new Command("herdr")
+          .description("Get whether the herdr integration is enabled.")
+          .action(() => configHandler("get", "herdr"))
       )
   )
   .addCommand(

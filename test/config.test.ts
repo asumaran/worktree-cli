@@ -65,7 +65,11 @@ describe('Config Management', () => {
                 reject: false,
                 env: {
                     ...process.env,
-                    // Ensure the test config directory is used
+                    // Ensure the test config directory is used. WT_CONFIG_DIR
+                    // reliably isolates the store on every OS (conf ignores
+                    // XDG_CONFIG_HOME on macOS), keeping the real user config
+                    // untouched.
+                    WT_CONFIG_DIR: testConfigDir,
                     XDG_CONFIG_HOME: process.platform === 'win32' ? undefined : testConfigDir,
                     APPDATA: process.platform === 'win32' ? testConfigDir : undefined,
                 },
@@ -379,6 +383,48 @@ describe('Config Management', () => {
             expect(invalidResult.exitCode).toBe(1);
             expect(invalidResult.stderr).toContain('Invalid provider');
             expect(invalidResult.stderr).toContain('Valid providers: gh, glab');
+        });
+    });
+
+    describe('herdr integration', () => {
+        it('should default to on', async () => {
+            const result = await runConfig(['get', 'herdr']);
+
+            expect(result.exitCode).toBe(0);
+            expect(result.stdout).toContain('herdr integration is currently');
+            expect(result.stdout).toContain('on');
+        });
+
+        it('should turn the herdr integration off', async () => {
+            const setResult = await runConfig(['set', 'herdr', 'off']);
+            expect(setResult.exitCode).toBe(0);
+            expect(setResult.stdout).toContain('herdr integration set to');
+            expect(setResult.stdout).toContain('off');
+
+            const config = await getConfigFileContent();
+            expect(config.herdrIntegration).toBe(false);
+
+            const getResult = await runConfig(['get', 'herdr']);
+            expect(getResult.stdout).toContain('off');
+        });
+
+        it('should turn the herdr integration back on', async () => {
+            await runConfig(['set', 'herdr', 'off']);
+            const setResult = await runConfig(['set', 'herdr', 'on']);
+
+            expect(setResult.exitCode).toBe(0);
+            expect(setResult.stdout).toContain('on');
+
+            const config = await getConfigFileContent();
+            expect(config.herdrIntegration).toBe(true);
+        });
+
+        it('should reject invalid herdr values', async () => {
+            const result = await runConfig(['set', 'herdr', 'maybe']);
+
+            expect(result.exitCode).toBe(1);
+            expect(result.stderr).toContain('Invalid value for herdr');
+            expect(result.stderr).toContain('Valid values: on, off');
         });
     });
 });

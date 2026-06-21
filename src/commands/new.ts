@@ -15,6 +15,7 @@ import { resolveWorktreePath, validateBranchName } from "../utils/paths.js";
 import { AtomicWorktreeOperation } from "../utils/atomic.js";
 import { handleDirtyState, confirm } from "../utils/tui.js";
 import { onShutdown } from "../utils/shutdown.js";
+import { openInHerdr } from "../utils/herdr.js";
 
 export async function newWorktreeHandler(
     branchName?: string,
@@ -152,7 +153,11 @@ export async function newWorktreeHandler(
             }
         }
 
-        // 7. Open in the specified editor (or use configured default)
+        // 7. Register the worktree in herdr's sidebar (best-effort, no-op
+        // without herdr). Runs for both freshly created and reused worktrees.
+        await openInHerdr(resolvedPath);
+
+        // 8. Open in the specified editor (or use configured default)
         const configuredEditor = getDefaultEditor();
         const editorCommand = options.editor || configuredEditor;
 
