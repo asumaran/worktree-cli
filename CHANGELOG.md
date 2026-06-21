@@ -1,3 +1,9 @@
+## v1.1.1 (2026-06-21)
+
+### Bug Fixes
+
+* **herdr:** pass `--cwd <repo-root>` to `herdr worktree open` so the worktree resolves from its parent repo workspace (the CLI talks to the server over a socket and does not inherit the caller's cwd). Without it herdr returned `worktree_not_found`.
+
 ## v1.1.0 (2026-06-21)
 
 ### Features
