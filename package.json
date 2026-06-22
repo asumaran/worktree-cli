@@ -1,37 +1,37 @@
 {
-	"name": "@asumaran/worktree",
-	"version": "1.1.1",
-	"packageManager": "pnpm@9.5.0",
-	"description": "A CLI tool for managing Git worktrees and opening them in your editor of choice.",
-	"author": "Alfredo Sumaran <a.sumaran@gmail.com>",
-	"license": "MIT",
-	"type": "module",
-	"bin": {
-		"wt": "build/index.js"
-	},
-	"scripts": {
-		"build": "tsc",
-		"postbuild": "node -e \"const fs = require('fs'); try { fs.chmodSync('build/index.js', 0o755); } catch (e) { if (process.platform !== 'win32') throw e; }\"",
-		"start": "node build/index.js",
-		"dev": "tsc -w",
-		"test": "vitest run"
-	},
-	"dependencies": {
-		"chalk": "^5.2.0",
-		"commander": "^10.0.1",
-		"conf": "^13.1.0",
-		"execa": "^7.1.1",
-		"ora": "^9.0.0",
-		"prompts": "^2.4.2"
-	},
-	"devDependencies": {
-		"@types/node": "^18.0.0",
-		"@types/prompts": "^2.4.9",
-		"@vitest/coverage-v8": "^3.1.1",
-		"typescript": "^5.0.2",
-		"vitest": "^3.1.1"
-	},
-	"files": [
-		"build"
-	]
+  "name": "@asumaran/worktree",
+  "version": "1.1.2",
+  "packageManager": "pnpm@9.5.0",
+  "description": "A CLI tool for managing Git worktrees and opening them in your editor of choice.",
+  "author": "Alfredo Sumaran <a.sumaran@gmail.com>",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "wt": "build/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "postbuild": "node -e \"const fs = require('fs'); try { fs.chmodSync('build/index.js', 0o755); } catch (e) { if (process.platform !== 'win32') throw e; }\"",
+    "start": "node build/index.js",
+    "dev": "tsc -w",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "chalk": "^5.2.0",
+    "commander": "^10.0.1",
+    "conf": "^13.1.0",
+    "execa": "^7.1.1",
+    "ora": "^9.0.0",
+    "prompts": "^2.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/prompts": "^2.4.9",
+    "@vitest/coverage-v8": "^3.1.1",
+    "typescript": "^5.0.2",
+    "vitest": "^3.1.1"
+  },
+  "files": [
+    "build"
+  ]
 }
