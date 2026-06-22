@@ -18,6 +18,7 @@ import { AtomicWorktreeOperation } from "../utils/atomic.js";
 import { handleDirtyState, selectPullRequest } from "../utils/tui.js";
 import { withSpinner } from "../utils/spinner.js";
 import { onShutdown } from "../utils/shutdown.js";
+import { openInHerdr } from "../utils/herdr.js";
 
 type GitProvider = 'gh' | 'glab';
 
@@ -393,7 +394,12 @@ export async function prWorktreeHandler(
             }
         }
 
-        // 12. Open in editor
+        // 12. Register/focus the worktree in herdr's sidebar (best-effort,
+        // no-op without herdr). Mirrors `wt new`/`wt open` so the sidebar stays
+        // in sync and the worktree gains focus.
+        await openInHerdr(resolvedPath);
+
+        // 13. Open in editor
         const configuredEditor = getDefaultEditor();
         const editorCommand = options.editor || configuredEditor;
 
