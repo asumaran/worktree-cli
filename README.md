@@ -29,9 +29,22 @@ Installing straight from the release URL (rather than a file downloaded to a
 temp dir) keeps pnpm's global dependency pointed at a stable source, so later
 `pnpm add/rm -g` runs don't break on a vanished temp path.
 
-To update later, run the same command again (it always resolves the latest
-release). To install a specific version, pass the tag to `gh release view`,
+To install a specific version, pass the tag to `gh release view`,
 e.g. `gh release view v1.0.0 -R asumaran/worktree-cli --json assets -q '...'`.
+
+### Updating
+
+A global install pins the resolved versioned tarball URL, so it never follows
+later releases on its own. To move to the latest published release, run the same
+install command again, or use the helper (which resolves the latest release and
+reinstalls):
+
+```bash
+scripts/update-local.sh
+```
+
+This is deliberately separate from releasing: `scripts/release.sh` only cuts a
+release; `scripts/update-local.sh` only updates this machine's install.
 
 ## Releasing
 
@@ -52,8 +65,11 @@ release with those notes.
 Pushing the tag triggers a GitHub Actions workflow that builds the project,
 packs a tarball whose version matches the tag, and attaches it to the release.
 The `build/` directory is not committed; it is produced in CI and shipped only
-as the release tarball. Afterwards, update your global install (see
-[Installation](#installation)).
+as the release tarball.
+
+Releasing does not touch your local install. Updating your own machine to the
+new release is a separate step — run `scripts/update-local.sh` (see
+[Updating](#updating)).
 
 ## Usage
 
