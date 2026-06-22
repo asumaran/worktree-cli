@@ -45,7 +45,7 @@ describe('wt path', () => {
         await mkdir(repoDir, { recursive: true });
         await mkdir(configDir, { recursive: true });
 
-        await execa('git', ['init'], { cwd: repoDir });
+        await execa('git', ['init', '-b', 'main'], { cwd: repoDir });
         await execa('git', ['config', 'user.email', 'test@test.com'], { cwd: repoDir });
         await execa('git', ['config', 'user.name', 'Test User'], { cwd: repoDir });
         // Never sign test commits: tests must not depend on the user's signing
