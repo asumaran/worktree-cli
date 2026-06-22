@@ -32,16 +32,22 @@ e.g. `gh release download v1.0.0 ...`.
 
 ## Releasing
 
-Releases are created manually. A GitHub Actions workflow then builds the project,
-packs a tarball whose version matches the tag, and attaches it to the release:
+Use the release script. It refuses to tag unless the working tree is clean,
+`pnpm build` and `pnpm test` pass, and `CHANGELOG.md` documents the version —
+so the tag always points at a green, finished state (no drift between what is
+released and what `main` contains):
 
 ```bash
-pnpm build && pnpm test   # sanity check locally
-gh release create v1.1.0 --generate-notes
+# 1. add the "## vX.Y.Z" entry to CHANGELOG.md and commit it
+# 2. cut the release (builds, tests, bumps package.json, commits, tags, pushes)
+scripts/release.sh 1.2.0
 ```
 
+Pushing the tag triggers a GitHub Actions workflow that builds the project,
+packs a tarball whose version matches the tag, and attaches it to the release.
 The `build/` directory is not committed; it is produced in CI and shipped only
-as the release tarball.
+as the release tarball. Afterwards, reinstall with `./install.sh --modules
+worktree` from the dotfiles repo.
 
 ## Usage
 

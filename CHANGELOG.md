@@ -1,3 +1,13 @@
+## v1.1.2 (2026-06-21)
+
+### Features
+
+* **herdr:** add `WT_DISABLE_HERDR=1` to skip the herdr integration for a single invocation (escape hatch for CI/scripts), without changing config. Ships the kill-switch that was documented in v1.1.1 but not yet in the released build.
+
+### Build
+
+* add `scripts/release.sh`: a release is gated on a clean tree plus a green `pnpm build`/`pnpm test`, and the tag always matches the committed state (prevents release/`main` drift).
+
 ## v1.1.1 (2026-06-21)
 
 ### Bug Fixes
