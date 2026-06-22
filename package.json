@@ -1,6 +1,6 @@
 {
   "name": "@asumaran/worktree",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "packageManager": "pnpm@9.5.0",
   "description": "A CLI tool for managing Git worktrees and opening them in your editor of choice.",
   "author": "Alfredo Sumaran <a.sumaran@gmail.com>",
