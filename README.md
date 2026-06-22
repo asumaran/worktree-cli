@@ -35,22 +35,25 @@ e.g. `gh release view v1.0.0 -R asumaran/worktree-cli --json assets -q '...'`.
 
 ## Releasing
 
-Use the release script. It refuses to tag unless the working tree is clean,
-`pnpm test` passes (it builds first via the `pretest` hook), and `CHANGELOG.md` documents the version —
-so the tag always points at a green, finished state (no drift between what is
-released and what `main` contains):
+Cutting a release is a single command. Pick the next version (semver) and run:
 
 ```bash
-# 1. add the "## vX.Y.Z" entry to CHANGELOG.md and commit it
-# 2. cut the release (builds, tests, bumps package.json, commits, tags, pushes)
 scripts/release.sh 1.2.0
 ```
+
+The script refuses to tag unless the working tree is clean and `pnpm test`
+passes (it builds first via the `pretest` hook), so the tag always points at a
+green, finished state. It then generates the `CHANGELOG.md` entry and the
+GitHub release notes automatically from the commit subjects since the previous
+tag (release commits filtered out) — there is nothing to write by hand. After
+that it bumps `package.json`, commits, tags, pushes, and publishes the GitHub
+release with those notes.
 
 Pushing the tag triggers a GitHub Actions workflow that builds the project,
 packs a tarball whose version matches the tag, and attaches it to the release.
 The `build/` directory is not committed; it is produced in CI and shipped only
-as the release tarball. Afterwards, reinstall with `./install.sh --modules
-worktree` from the dotfiles repo.
+as the release tarball. Afterwards, update your global install (see
+[Installation](#installation)).
 
 ## Usage
 
