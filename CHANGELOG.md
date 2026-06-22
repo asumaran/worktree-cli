@@ -1,3 +1,9 @@
+## v1.2.1 (2026-06-21)
+
+* fix(paths): resolve sibling worktree path against the repo root (987e67c)
+* build(release): generate the changelog and release notes automatically (03cf714)
+* docs(readme): install from the stable release URL (4bfa6a6)
+
 ## v1.2.0 (2026-06-21)
 
 ### Features
