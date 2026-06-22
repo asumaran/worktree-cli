@@ -210,7 +210,34 @@ describe('wt new', () => {
         );
 
         expect(result.exitCode).toBe(0);
-        expect(result.stdout).toContain('existing worktree');
+        expect(result.stdout).toContain('Worktree already exists at');
+
+        // Cleanup
+        await execa('git', ['worktree', 'remove', '--force', worktreePath], { cwd: ctx.repoDir }).catch(() => {});
+    });
+
+    it('delegates to `wt open` when the worktree already exists', async () => {
+        const worktreePath = join(ctx.testDir, 'delegate-open');
+
+        // First call actually creates the worktree.
+        const created = await runCli(
+            ['new', 'feature/delegate', '--path', worktreePath, '--editor', 'none'],
+            ctx.repoDir
+        );
+        expect(created.exitCode).toBe(0);
+        expect(created.stdout).toContain('Creating new worktree');
+
+        // Second call must take the `wt open` path instead of re-creating.
+        const reopened = await runCli(
+            ['new', 'feature/delegate', '--path', worktreePath, '--editor', 'none'],
+            ctx.repoDir
+        );
+
+        expect(reopened.exitCode).toBe(0);
+        // Output comes from the open handler, proving the delegation...
+        expect(reopened.stdout).toContain('Opening worktree for branch "feature/delegate"');
+        // ...and it never tries to create the worktree a second time.
+        expect(reopened.stdout).not.toContain('Creating new worktree');
 
         // Cleanup
         await execa('git', ['worktree', 'remove', '--force', worktreePath], { cwd: ctx.repoDir }).catch(() => {});

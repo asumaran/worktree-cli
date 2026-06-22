@@ -1,7 +1,6 @@
 import { execa } from "execa";
 import chalk from "chalk";
 import { stat } from "node:fs/promises";
-import { resolve, join } from "node:path";
 import { getDefaultEditor, shouldSkipEditor } from "../config.js";
 import {
     isWorktreeClean,
@@ -16,6 +15,7 @@ import { AtomicWorktreeOperation } from "../utils/atomic.js";
 import { handleDirtyState, confirm } from "../utils/tui.js";
 import { onShutdown } from "../utils/shutdown.js";
 import { openInHerdr } from "../utils/herdr.js";
+import { openWorktreeHandler } from "./open.js";
 
 export async function newWorktreeHandler(
     branchName?: string,
@@ -46,7 +46,33 @@ export async function newWorktreeHandler(
         // 2. Check if this is a bare repository (Improvement #2)
         const isBare = await isMainRepoBare();
 
-        // 3. Check if main worktree is clean (skip for bare repos)
+        // 3. Resolve the target path up front so we can detect whether this
+        // worktree already exists (Improvement #1 & #7).
+        const resolvedPath = await resolveWorktreePath(branchName, {
+            customPath: options.path,
+            useRepoNamespace: true,  // Prevent global path collisions
+        });
+
+        let directoryExists = false;
+        try {
+            await stat(resolvedPath);
+            directoryExists = true;
+        } catch {
+            // Directory doesn't exist, continue with creation
+        }
+
+        // If the worktree already exists, this is really an "open", not a
+        // "new": delegate to `wt open` so the reuse/focus logic lives in a
+        // single place instead of being duplicated here.
+        if (directoryExists) {
+            console.log(chalk.yellow(`Worktree already exists at: ${resolvedPath}`));
+            await openWorktreeHandler(resolvedPath, { editor: options.editor });
+            return;
+        }
+
+        // --- From here on we are creating a brand new worktree ---
+
+        // 4. Check if main worktree is clean (skip for bare repos)
         if (!isBare) {
             console.log(chalk.blue("Checking if main worktree is clean..."));
             const isClean = await isWorktreeClean(".");
@@ -82,79 +108,41 @@ export async function newWorktreeHandler(
             }
         }
 
-        // 4. Build final path for the new worktree (Improvement #1 & #7)
-        const resolvedPath = await resolveWorktreePath(branchName, {
-            customPath: options.path,
-            useRepoNamespace: true,  // Prevent global path collisions
-        });
-
-        // Check if directory already exists
-        let directoryExists = false;
-        try {
-            await stat(resolvedPath);
-            directoryExists = true;
-        } catch {
-            // Directory doesn't exist, continue with creation
-        }
-
         // 5. Check if branch exists
         const remote = await getUpstreamRemote();
         const { stdout: localBranches } = await execa("git", ["branch", "--list", branchName]);
         const { stdout: remoteBranches } = await execa("git", ["branch", "-r", "--list", `${remote}/${branchName}`]);
         const branchExists = !!localBranches || !!remoteBranches;
 
-        // 6. Create the new worktree or open the editor if it already exists
-        if (directoryExists) {
-            console.log(chalk.yellow(`Directory already exists at: ${resolvedPath}`));
+        // 6. Create the new worktree (Improvement #9: atomic with rollback)
+        console.log(chalk.blue(`Creating new worktree for branch "${branchName}" at: ${resolvedPath}`));
 
-            // Check if this is a git worktree by checking for .git file/folder
-            let isGitWorktree = false;
-            try {
-                await stat(join(resolvedPath, ".git"));
-                isGitWorktree = true;
-            } catch {
-                // Not a git worktree
-            }
+        const atomic = new AtomicWorktreeOperation();
 
-            if (isGitWorktree) {
-                console.log(chalk.green(`Using existing worktree at: ${resolvedPath}`));
+        try {
+            if (!branchExists) {
+                console.log(chalk.yellow(`Branch "${branchName}" doesn't exist. Creating new branch with worktree...`));
+                await atomic.createWorktree(resolvedPath, branchName, true);
             } else {
-                console.log(chalk.yellow(`Warning: Directory exists but is not a git worktree.`));
+                console.log(chalk.green(`Using existing branch "${branchName}".`));
+                await atomic.createWorktree(resolvedPath, branchName, false);
             }
-        } else {
-            console.log(chalk.blue(`Creating new worktree for branch "${branchName}" at: ${resolvedPath}`));
 
-            // Improvement #2: Support for bare repositories
-            // Skip the bare check - bare repos work fine with worktrees
-
-            // Improvement #9: Atomic operations with rollback
-            const atomic = new AtomicWorktreeOperation();
-
-            try {
-                if (!branchExists) {
-                    console.log(chalk.yellow(`Branch "${branchName}" doesn't exist. Creating new branch with worktree...`));
-                    await atomic.createWorktree(resolvedPath, branchName, true);
-                } else {
-                    console.log(chalk.green(`Using existing branch "${branchName}".`));
-                    await atomic.createWorktree(resolvedPath, branchName, false);
-                }
-
-                // Run install if specified
-                if (options.install) {
-                    await atomic.runInstall(options.install, resolvedPath);
-                }
-
-                // Commit the atomic operation
-                atomic.commit();
-            } catch (error: any) {
-                console.error(chalk.red("Failed to create worktree:"), error.message);
-                await atomic.rollback();
-                throw error;
+            // Run install if specified
+            if (options.install) {
+                await atomic.runInstall(options.install, resolvedPath);
             }
+
+            // Commit the atomic operation
+            atomic.commit();
+        } catch (error: any) {
+            console.error(chalk.red("Failed to create worktree:"), error.message);
+            await atomic.rollback();
+            throw error;
         }
 
-        // 7. Register the worktree in herdr's sidebar (best-effort, no-op
-        // without herdr). Runs for both freshly created and reused worktrees.
+        // 7. Register/focus the worktree in herdr's sidebar (best-effort,
+        // no-op without herdr).
         await openInHerdr(resolvedPath);
 
         // 8. Open in the specified editor (or use configured default)
@@ -173,8 +161,8 @@ export async function newWorktreeHandler(
             }
         }
 
-        console.log(chalk.green(`Worktree ${directoryExists ? "opened" : "created"} at ${resolvedPath}.`));
-        if (!directoryExists && options.install) {
+        console.log(chalk.green(`Worktree created at ${resolvedPath}.`));
+        if (options.install) {
             console.log(chalk.green(`Dependencies installed using ${options.install}.`));
         }
 
