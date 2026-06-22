@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import { getDefaultEditor, shouldSkipEditor } from "../config.js";
 import { getWorktrees, findWorktreeByBranch, findWorktreeByPath, WorktreeInfo } from "../utils/git.js";
 import { selectWorktree } from "../utils/tui.js";
+import { openInHerdr } from "../utils/herdr.js";
 
 export async function openWorktreeHandler(
     pathOrBranch: string = "",
@@ -99,6 +100,10 @@ export async function openWorktreeHandler(
         if (targetWorktree.prunable) {
             console.log(chalk.yellow(`Warning: This worktree is marked as prunable${targetWorktree.pruneReason ? `: ${targetWorktree.pruneReason}` : ''}`));
         }
+
+        // Register/focus the worktree in herdr's sidebar (best-effort, no-op
+        // without herdr). Mirrors `wt new` so reopening keeps the sidebar in sync.
+        await openInHerdr(targetPath);
 
         // Open in the specified editor (or use configured default)
         const configuredEditor = getDefaultEditor();
