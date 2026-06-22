@@ -7,7 +7,7 @@
 # script makes sure we never tag a half-finished or broken state:
 #
 #   1. the working tree must be clean (the tag == exactly what is committed)
-#   2. `pnpm build` and `pnpm test` must pass
+#   2. `pnpm test` must pass (it builds first via the `pretest` hook)
 #   3. CHANGELOG.md must already document the target version
 #
 # Only then does it bump package.json, commit, tag `vX.Y.Z`, and push.
@@ -58,9 +58,8 @@ if ! grep -qE "^## (v?\[?${VERSION//./\\.})" CHANGELOG.md; then
 fi
 
 # --- quality gate -----------------------------------------------------------
-echo "==> Building..."
-pnpm build
-echo "==> Testing..."
+# `pnpm test` builds first via the `pretest` hook, so the build is covered here.
+echo "==> Building and testing..."
 pnpm test
 
 # --- apply ------------------------------------------------------------------

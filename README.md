@@ -33,7 +33,7 @@ e.g. `gh release download v1.0.0 ...`.
 ## Releasing
 
 Use the release script. It refuses to tag unless the working tree is clean,
-`pnpm build` and `pnpm test` pass, and `CHANGELOG.md` documents the version —
+`pnpm test` passes (it builds first via the `pretest` hook), and `CHANGELOG.md` documents the version —
 so the tag always points at a green, finished state (no drift between what is
 released and what `main` contains):
 
