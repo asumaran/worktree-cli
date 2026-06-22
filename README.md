@@ -20,15 +20,18 @@ prebuilt tarball as an asset, so nothing is compiled on install. This requires
 the [GitHub CLI](https://cli.github.com/) (`gh`):
 
 ```bash
-tmp=$(mktemp -d)
-gh release download -R asumaran/worktree-cli --pattern '*.tgz' --dir "$tmp"
-pnpm add -g "$tmp"/*.tgz
-rm -rf "$tmp"
+url=$(gh release view -R asumaran/worktree-cli --json assets \
+  -q '.assets[] | select(.name | endswith(".tgz")) | .url')
+pnpm add -g "$url"
 ```
 
-To update later, run the same commands again (they always fetch the latest
-release). To install a specific version, pass the tag to `gh release download`,
-e.g. `gh release download v1.0.0 ...`.
+Installing straight from the release URL (rather than a file downloaded to a
+temp dir) keeps pnpm's global dependency pointed at a stable source, so later
+`pnpm add/rm -g` runs don't break on a vanished temp path.
+
+To update later, run the same command again (it always resolves the latest
+release). To install a specific version, pass the tag to `gh release view`,
+e.g. `gh release view v1.0.0 -R asumaran/worktree-cli --json assets -q '...'`.
 
 ## Releasing
 
