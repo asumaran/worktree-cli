@@ -107,6 +107,19 @@ describe('wt path', () => {
         expect(result.stdout.trim()).toBe(join(dirname(realRepoDir), 'repo-feature-x'));
     });
 
+    it('resolves the sibling path against the repo root when run from a subdirectory', async () => {
+        const subDir = join(repoDir, 'packages', 'app');
+        await mkdir(subDir, { recursive: true });
+
+        const result = await run(['path', 'feature/x'], subDir);
+
+        expect(result.exitCode).toBe(0);
+        // The worktree must be a sibling of the repo root, not of the
+        // subdirectory the command happened to run from.
+        const realRepoDir = await realpath(repoDir);
+        expect(result.stdout.trim()).toBe(join(dirname(realRepoDir), 'repo-feature-x'));
+    });
+
     it('exits non-zero when run outside a git repository', async () => {
         const result = await run(['path', 'feature/x'], testDir);
 

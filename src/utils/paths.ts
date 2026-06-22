@@ -1,6 +1,6 @@
 import { join, dirname, basename, resolve } from "node:path";
 import { getDefaultWorktreePath } from "../config.js";
-import { getRepoName } from "./git.js";
+import { getRepoName, getRepoRoot } from "./git.js";
 
 /**
  * Resolve a worktree name from a branch name
@@ -88,10 +88,13 @@ export async function resolveWorktreePath(
         return join(defaultWorktreePath, worktreeName);
     }
 
-    // Case 3: No config - create sibling directory
-    const parentDir = dirname(cwd);
-    const currentDirName = basename(cwd);
-    return join(parentDir, `${currentDirName}-${worktreeName}`);
+    // Case 3: No config - create a sibling directory of the repository root.
+    // Resolve from the repo root rather than the caller's cwd so the worktree
+    // lands beside the repo even when the command is run from a subdirectory.
+    const repoRoot = (await getRepoRoot(cwd)) ?? cwd;
+    const parentDir = dirname(repoRoot);
+    const repoDirName = basename(repoRoot);
+    return join(parentDir, `${repoDirName}-${worktreeName}`);
 }
 
 /**
