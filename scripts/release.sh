@@ -76,7 +76,12 @@ git tag "$tag"
 if $DO_PUSH; then
   git push origin HEAD
   git push origin "$tag"
-  echo "released ${tag} and pushed branch + tag. CI will attach the tarball."
+  # The build workflow triggers on a *published GitHub release*, not on a tag
+  # push, so create the release (which also generates notes). This is what
+  # attaches the installable tarball.
+  gh release create "$tag" --verify-tag --generate-notes --title "$tag"
+  echo "released ${tag}: pushed branch + tag and published the GitHub release. CI will attach the tarball."
 else
-  echo "released ${tag} locally (not pushed). Push with: git push origin HEAD && git push origin ${tag}"
+  echo "released ${tag} locally (tag created, not pushed)."
+  echo "Finish with: git push origin HEAD && git push origin ${tag} && gh release create ${tag} --verify-tag --generate-notes --title ${tag}"
 fi
