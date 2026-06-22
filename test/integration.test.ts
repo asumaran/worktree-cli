@@ -33,6 +33,9 @@ async function createTestRepo(): Promise<TestContext> {
     await execa('git', ['init'], { cwd: repoDir });
     await execa('git', ['config', 'user.email', 'test@test.com'], { cwd: repoDir });
     await execa('git', ['config', 'user.name', 'Test User'], { cwd: repoDir });
+    // Never sign test commits: tests must not depend on the user's signing
+    // agent (it can refuse/hang under load and break the repo setup).
+    await execa('git', ['config', 'commit.gpgsign', 'false'], { cwd: repoDir });
 
     // Create initial commit
     await writeFile(join(repoDir, 'README.md'), '# Test Repository\n');
@@ -64,6 +67,9 @@ async function runCli(args: string[], cwd: string, options: { stdin?: string } =
                 ...process.env,
                 // Disable editor opening in tests
                 WT_EDITOR: 'none',
+                // Never touch the real herdr from tests (wt new/setup would
+                // otherwise register temp test repos in the user's sidebar).
+                WT_DISABLE_HERDR: '1',
             },
         });
         return {

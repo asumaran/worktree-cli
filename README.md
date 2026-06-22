@@ -392,6 +392,13 @@ wt config set herdr on
 wt config get herdr
 ```
 
+You can also skip the integration for a single invocation (or in CI/tests)
+without changing the config by setting `WT_DISABLE_HERDR=1`:
+
+```bash
+WT_DISABLE_HERDR=1 wt new feature/login
+```
+
 ### Setup Worktree Configuration
 
 You can define setup commands in one of two locations to automatically execute them when using `wt setup`:

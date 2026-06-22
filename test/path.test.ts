@@ -48,6 +48,9 @@ describe('wt path', () => {
         await execa('git', ['init'], { cwd: repoDir });
         await execa('git', ['config', 'user.email', 'test@test.com'], { cwd: repoDir });
         await execa('git', ['config', 'user.name', 'Test User'], { cwd: repoDir });
+        // Never sign test commits: tests must not depend on the user's signing
+        // agent (it can refuse/hang under load and break the repo setup).
+        await execa('git', ['config', 'commit.gpgsign', 'false'], { cwd: repoDir });
         await writeFile(join(repoDir, 'README.md'), '# Test\n');
         await execa('git', ['add', '.'], { cwd: repoDir });
         await execa('git', ['commit', '-m', 'init'], { cwd: repoDir });

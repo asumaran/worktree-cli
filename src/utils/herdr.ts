@@ -40,6 +40,11 @@ async function getMainRepoRoot(): Promise<string | undefined> {
  * @param worktreePath - Absolute path to the worktree to register
  */
 export async function openInHerdr(worktreePath: string): Promise<void> {
+    // Hard kill-switch: lets tests/CI (and one-off invocations) skip the
+    // external herdr call entirely, without depending on persisted config.
+    if (process.env.WT_DISABLE_HERDR === "1") {
+        return;
+    }
     if (!isHerdrIntegrationEnabled()) {
         return;
     }
