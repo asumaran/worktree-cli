@@ -1,3 +1,17 @@
+## v1.2.0 (2026-06-21)
+
+### Features
+
+* **open:** `wt open` now registers and focuses the reopened worktree in the [herdr](https://herdr.dev) sidebar, matching `wt new`. Best-effort and no-op when herdr isn't installed or the integration is off.
+
+### Refactor
+
+* **new:** when the target worktree already exists, `wt new` delegates to `wt open` instead of duplicating the reuse/open logic, so creating and reopening share a single code path.
+
+### Build
+
+* run the build before tests via an npm `pretest` hook, so the integration suite (which runs against `build/`) never tests stale output. Drops the now-redundant explicit build step from `scripts/release.sh`.
+
 ## v1.1.2 (2026-06-21)
 
 ### Features
