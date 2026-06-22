@@ -1,3 +1,9 @@
+## v1.2.2 (2026-06-22)
+
+* fix(pr): register the PR worktree in the herdr sidebar (9e22e58)
+* docs: add CLAUDE.md with development and release guidance (ce897ff)
+* feat(scripts): add update-local.sh to update the global install (1a38008)
+
 ## v1.2.1 (2026-06-21)
 
 * fix(paths): resolve sibling worktree path against the repo root (987e67c)
