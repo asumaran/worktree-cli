@@ -148,3 +148,30 @@
      git worktree list
      ```
      Ensure that only the main branch worktree remains (or those you opted not to remove).
+
+## Manual Test for `wt open` Target Resolution
+
+1. **Setup:**
+   ```bash
+   wt new feature/login
+   ```
+2. **Open by each form** and confirm the same worktree opens:
+   ```bash
+   wt open feature/login                 # by branch name
+   wt open <repoName>-feature-login      # by worktree folder name (basename)
+   wt open /abs/path/to/that/worktree    # by path
+   ```
+3. **Branch without a worktree:** create a branch with no worktree and confirm
+   the suggestion:
+   ```bash
+   git branch feature/no-wt
+   wt open feature/no-wt   # should error and suggest: wt new feature/no-wt
+   ```
+4. **PR/MR reference:** with a PR that already has a worktree, confirm
+   `wt open "#<pr>"` and `wt open <pr-url>` open it. With a PR that has no
+   worktree, confirm `wt open "#<pr>"` errors and suggests `wt pr <pr>`.
+5. **Wrong-repo URL:** confirm a PR URL for a different repository is rejected
+   before any network call:
+   ```bash
+   wt open https://github.com/someone-else/other-repo/pull/1   # should fail fast
+   ```

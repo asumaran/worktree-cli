@@ -21,7 +21,9 @@ registry); installed globally with `pnpm add -g <release-tarball-url>`.
   `*Handler`.
 - `src/utils/*.ts` — shared helpers: `git.ts` (all git plumbing),
   `paths.ts` (worktree path/name resolution), `atomic.ts` (create-with-rollback),
-  `herdr.ts`, `tui.ts`, `workflow.ts`, `setup.ts`, `shutdown.ts`, `spinner.ts`.
+  `pr.ts` (PR/MR reference parsing + repo-ownership validation, shared by
+  `open`/`pr`), `herdr.ts`, `tui.ts`, `workflow.ts`, `setup.ts`, `shutdown.ts`,
+  `spinner.ts`.
 - `src/config.ts` — `conf`-backed settings (editor, provider, worktreepath,
   herdr).
 - `build/` is **not committed**; it is produced by `tsc` locally and in CI.
@@ -65,12 +67,26 @@ repo root** named `<repoDirName>-<sanitizedBranch>`. Branch `/` is replaced with
 is correct when run from a subdirectory. `wt path` must print exactly what
 `wt new` would create.
 
+## Target resolution (`wt open`)
+
+`wt open <target>` resolves, in order: existing path → exact branch → worktree
+folder name (basename) → PR/MR reference. A `#123` or a PR/MR URL is treated as
+an explicit PR reference; a bare `123` is tried locally first and only falls back
+to PR resolution when nothing local matches (so a branch/folder named `123`
+wins, and no network call happens on a local hit). `open` never creates or
+fetches: for a PR with no worktree it points at `wt pr`, and for a local branch
+with no worktree it points at `wt new`. PR reference parsing and repo-ownership
+validation for URLs live in `src/utils/pr.ts` and are shared with `wt pr`, which
+accepts the same `#123`/`123`/URL forms.
+
 ## Testing
 
 - Vitest, `test/**/*.test.ts`. Integration tests run the **built** CLI
   (`build/index.js`) against a real temp git repo, so `pretest` builds first.
-- Isolate state in tests: set `WT_CONFIG_DIR` to a temp dir (config store) and
-  `WT_DISABLE_HERDR=1`. Init repos with `git init -b main` and
+- Isolate state in tests: set `WT_CONFIG_DIR` to a temp dir (config store),
+  `WT_DISABLE_HERDR=1`, and `WT_EDITOR=none` (the last one is honored by
+  `getDefaultEditor` so tests never launch a real editor). Init repos with
+  `git init -b main` and
   `git config commit.gpgsign false` (tests must not depend on the user's signing
   agent). On macOS temp paths are symlinked (`/var` → `/private/var`); compare
   against `realpath`.

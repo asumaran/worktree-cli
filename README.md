@@ -128,6 +128,11 @@ wt pr [prNumber] [options]
 
 **Interactive Selection**: Run `wt pr` without a number to see a list of open PRs/MRs to choose from.
 
+The reference can be a number (`123`), a `#`-prefixed number (`#123`), or a full
+PR/MR URL (e.g. `https://github.com/owner/repo/pull/123`). When a URL is given,
+`wt` verifies it points at the repository you are in before doing any work and
+fails fast otherwise.
+
 Uses the GitHub CLI (`gh`) or GitLab CLI (`glab`) to fetch the branch associated with the given Pull Request or Merge Request number directly (without switching your current branch), and creates a worktree for it.
 
 **Benefit:** Your main worktree stays untouched. Commits made in the PR worktree can be pushed directly using `git push` to update the PR/MR.
@@ -147,8 +152,10 @@ Example:
 # Interactive PR selection
 wt pr
 
-# Create worktree for GitHub PR #123
+# Create worktree for GitHub PR #123 (any of these forms works)
 wt pr 123
+wt pr "#123"
+wt pr https://github.com/owner/repo/pull/123
 
 # Create worktree for GitLab MR #456 with deps and editor
 wt pr 456 -i pnpm -e code
@@ -157,19 +164,44 @@ wt pr 456 -i pnpm -e code
 wt pr 123 --setup
 ```
 
+> In most shells `#` starts a comment, so quote it (`wt pr "#123"`) or just use
+> the bare number.
+
 ### Open an existing worktree
 
 ```bash
-wt open [pathOrBranch]
+wt open [target]
 ```
+
+Opens an **existing** worktree in the editor. It never creates or fetches
+anything (use `wt new` or `wt pr` for that). The `target` is resolved, in order,
+as:
+
+1. An existing directory **path** (absolute or relative).
+2. An exact **branch name**.
+3. A worktree **folder name** (the directory basename, e.g.
+   `myrepo-feature-login`, which usually differs from the branch name).
+4. A **PR/MR reference**: `#123`, or a full PR/MR URL. URLs are validated against
+   the current repository before any lookup.
+5. A **bare number** (`123`): tried as a local branch/folder first, then as a
+   PR/MR number. So a real branch or folder literally named `123` always wins,
+   and no network call is made when a local match exists.
+
+For a PR/MR reference, `wt` resolves the PR's head branch and opens its worktree
+**if one already exists**; otherwise it points you at `wt pr <number>` to create
+it. If you pass a branch name that exists locally but has no worktree yet, `wt`
+suggests `wt new <branch>`.
 
 **Interactive Selection**: Run `wt open` without arguments to see a fuzzy-searchable list of worktrees.
 
 Example:
 ```bash
-wt open                    # Interactive selection
-wt open feature/login      # Open by branch name
-wt open ./path/to/worktree # Open by path
+wt open                      # Interactive selection
+wt open feature/login        # Open by branch name
+wt open myrepo-feature-login # Open by worktree folder name
+wt open ./path/to/worktree   # Open by path
+wt open "#123"               # Open the worktree for PR/MR #123
+wt open https://github.com/owner/repo/pull/123  # Open by PR/MR URL
 ```
 
 ### Navigate to a worktree
@@ -336,6 +368,16 @@ wt config path
 The default editor will be used when creating new worktrees unless overridden with the `-e` flag.
 
 Setting the editor to `none` will skip opening any editor after creating a worktree, which is useful for CI/CD pipelines or scripts.
+
+You can also override the editor for a single invocation without touching the
+config by setting the `WT_EDITOR` environment variable (it takes precedence over
+the stored editor, mirroring `WT_DISABLE_HERDR`). Setting `WT_EDITOR=none` skips
+the editor entirely, which is handy in CI and tests:
+
+```bash
+WT_EDITOR=code wt open feature/login   # open in VS Code just this once
+WT_EDITOR=none wt new feature/ci-build # create without launching an editor
+```
 
 ### Configure Git Provider
 
