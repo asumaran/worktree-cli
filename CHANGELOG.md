@@ -1,3 +1,9 @@
+## v1.3.0 (2026-07-02)
+
+* feat(open): resolve worktrees by folder name, PR id, and PR/MR URL (1886b64)
+* fix(config): honor WT_EDITOR to override the configured editor (630aa71)
+* docs: document flexible open/pr target resolution and WT_EDITOR (c32422b)
+
 ## v1.2.2 (2026-06-22)
 
 * fix(pr): register the PR worktree in the herdr sidebar (9e22e58)
