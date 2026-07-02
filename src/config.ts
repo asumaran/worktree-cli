@@ -55,6 +55,13 @@ const config = new Conf<ConfigSchema>({
 
 // Function to get the default editor
 export function getDefaultEditor(): string {
+    // WT_EDITOR overrides the configured editor for a single invocation. Tests
+    // set it to 'none' to avoid launching a real editor; it also works as an
+    // ad-hoc override, mirroring WT_CONFIG_DIR / WT_DISABLE_HERDR.
+    const envEditor = process.env.WT_EDITOR;
+    if (envEditor && envEditor.trim() !== '') {
+        return envEditor;
+    }
     return config.get('defaultEditor');
 }
 
