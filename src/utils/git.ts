@@ -235,6 +235,49 @@ export async function detectGitProvider(cwd: string = "."): Promise<'gh' | 'glab
 }
 
 /**
+ * Identity of a repository derived from its upstream remote URL.
+ */
+export interface RepoIdentity {
+    /** Lowercase hostname (e.g. "github.com"), or null if it can't be parsed. */
+    host: string | null;
+    /** Repository owner / namespace (last owner segment). */
+    owner: string;
+    /** Repository name (may include a trailing ".git" if the URL did). */
+    repo: string;
+}
+
+/**
+ * Resolve the owner/repo/host of the repository at `cwd` from its upstream
+ * remote URL.
+ *
+ * Uses the same remote-selection heuristics as {@link detectGitProvider}
+ * (upstream tracking, then common remote names). Handles HTTPS and SSH URLs.
+ *
+ * @throws if no remote URL is available or it cannot be parsed.
+ */
+export async function getRepoIdentity(cwd: string = "."): Promise<RepoIdentity> {
+    const remote = await getUpstreamRemote(cwd);
+    const { stdout } = await execa("git", ["-C", cwd, "remote", "get-url", remote]);
+    const remoteUrl = stdout.trim();
+
+    if (!remoteUrl) {
+        throw new Error("The current repository has no remote URL configured.");
+    }
+
+    const host = getRemoteHostname(remoteUrl);
+
+    // Capture the last two path segments as owner/repo. Strips an optional
+    // trailing ".git". Works for both "host:owner/repo" (SSH) and
+    // "https://host/owner/repo" URLs.
+    const match = remoteUrl.match(/[:/]([^/]+)\/([^/]+?)(?:\.git)?\/?$/);
+    if (!match) {
+        throw new Error(`Could not parse repository info from remote URL: ${remoteUrl}`);
+    }
+
+    return { host, owner: match[1], repo: match[2] };
+}
+
+/**
  * Represents a parsed Git worktree with typed fields
  */
 export interface WorktreeInfo {
@@ -351,6 +394,23 @@ export async function findWorktreeByBranch(branch: string, cwd: string = "."): P
 }
 
 /**
+ * Check whether a local branch exists (a `refs/heads/<branch>` ref), regardless
+ * of whether it is currently checked out in a worktree.
+ *
+ * @param branch - Exact branch name (short form, no `refs/heads/` prefix)
+ * @param cwd - Working directory to run git command from
+ * @returns true if the local branch ref exists, false otherwise
+ */
+export async function localBranchExists(branch: string, cwd: string = "."): Promise<boolean> {
+    try {
+        await execa("git", ["-C", cwd, "show-ref", "--verify", "--quiet", `refs/heads/${branch}`]);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
  * Find a worktree by path
  *
  * @param path - Path to find (will be compared against worktree paths)
@@ -385,6 +445,22 @@ export async function findWorktreeByPath(targetPath: string, cwd: string = "."):
     }
 
     return null;
+}
+
+/**
+ * Find a worktree by the basename of its directory.
+ *
+ * This matches the folder name that `wt new` produces (e.g.
+ * "<repo>-<sanitized-branch>"), which is often different from the branch name.
+ *
+ * @param name - Folder name to match against each worktree's directory basename
+ * @param cwd - Working directory to run git command from
+ * @returns WorktreeInfo if found, null otherwise
+ */
+export async function findWorktreeByFolderName(name: string, cwd: string = "."): Promise<WorktreeInfo | null> {
+    const worktrees = await getWorktrees(cwd);
+    const { basename } = await import('node:path');
+    return worktrees.find(wt => basename(wt.path) === name) || null;
 }
 
 /**

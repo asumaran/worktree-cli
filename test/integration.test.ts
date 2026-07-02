@@ -420,3 +420,131 @@ describe('WorktreeInfo Parsing', () => {
         await execa('git', ['worktree', 'remove', '--force', wtPath], { cwd: ctx.repoDir }).catch(() => {});
     });
 });
+
+describe('wt open resolution', () => {
+    let ctx: TestContext;
+
+    beforeEach(async () => {
+        ctx = await createTestRepo();
+    });
+
+    afterEach(async () => {
+        await ctx.cleanup();
+    });
+
+    it('opens a worktree by branch name', async () => {
+        const wtPath = join(ctx.testDir, 'by-branch');
+        await runCli(['new', 'feature/by-branch', '--path', wtPath, '--editor', 'none'], ctx.repoDir);
+
+        const result = await runCli(['open', 'feature/by-branch'], ctx.repoDir);
+        expect(result.exitCode).toBe(0);
+        expect(result.stdout).toContain('Opening worktree for branch "feature/by-branch"');
+        // WT_EDITOR=none (set by runCli) must actually suppress launching an
+        // editor; guards against the env override silently becoming a no-op.
+        expect(result.stdout).toContain('skipping editor open');
+    });
+
+    it('opens a worktree by its full path', async () => {
+        const wtPath = join(ctx.testDir, 'by-path');
+        await runCli(['new', 'feature/by-path', '--path', wtPath, '--editor', 'none'], ctx.repoDir);
+
+        const result = await runCli(['open', wtPath], ctx.repoDir);
+        expect(result.exitCode).toBe(0);
+        expect(result.stdout).toContain('Opening worktree for branch "feature/by-path"');
+    });
+
+    it('opens a worktree by its folder name (basename)', async () => {
+        // Use a folder name that differs from the branch name, so matching by
+        // basename is the only thing that can resolve it. The folder lives under
+        // testDir (a sibling of the repo), not inside repoDir, so it is not
+        // reachable as a path relative to the command's cwd.
+        const folderName = 'custom-folder-name';
+        const wtPath = join(ctx.testDir, folderName);
+        await runCli(['new', 'feature/folder-name', '--path', wtPath, '--editor', 'none'], ctx.repoDir);
+
+        const result = await runCli(['open', folderName], ctx.repoDir);
+        expect(result.exitCode).toBe(0);
+        expect(result.stdout).toContain('Opening worktree for branch "feature/folder-name"');
+    });
+
+    it('resolves a bare number to a local branch before treating it as a PR', async () => {
+        // A branch literally named "123" must win over PR resolution: local
+        // lookups run first, so no network/CLI call is made.
+        const wtPath = join(ctx.testDir, 'branch-123');
+        await runCli(['new', '123', '--path', wtPath, '--editor', 'none'], ctx.repoDir);
+
+        const result = await runCli(['open', '123'], ctx.repoDir);
+        expect(result.exitCode).toBe(0);
+        expect(result.stdout).toContain('Opening worktree for branch "123"');
+    });
+
+    it('rejects a PR URL that points to a different repository (offline)', async () => {
+        // Give the repo a known remote, then open a URL for a different repo.
+        // Validation happens before any network/CLI call.
+        await execa('git', ['remote', 'add', 'origin', 'https://github.com/realowner/realrepo.git'], { cwd: ctx.repoDir });
+
+        const result = await runCli(
+            ['open', 'https://github.com/someone-else/other-repo/pull/1'],
+            ctx.repoDir
+        );
+        expect(result.exitCode).toBe(1);
+        expect(result.stderr).toContain('someone-else/other-repo');
+        expect(result.stderr).toContain('realowner/realrepo');
+    });
+
+    it('errors when the argument matches nothing', async () => {
+        const result = await runCli(['open', 'does-not-exist'], ctx.repoDir);
+        expect(result.exitCode).toBe(1);
+        expect(result.stderr).toContain('Could not find a worktree matching "does-not-exist"');
+    });
+
+    it('suggests `wt new` when the branch exists but has no worktree', async () => {
+        // A local branch with no worktree checked out for it.
+        await execa('git', ['branch', 'feature/no-wt'], { cwd: ctx.repoDir });
+
+        const result = await runCli(['open', 'feature/no-wt'], ctx.repoDir);
+        expect(result.exitCode).toBe(1);
+        expect(result.stderr).toContain('Branch "feature/no-wt" exists but has no worktree');
+        expect(result.stderr).toContain('wt new feature/no-wt');
+    });
+
+    it('errors when a path exists but is not a git worktree', async () => {
+        const plainDir = join(ctx.testDir, 'plain-dir');
+        await mkdir(plainDir, { recursive: true });
+
+        const result = await runCli(['open', plainDir], ctx.repoDir);
+        expect(result.exitCode).toBe(1);
+        expect(result.stderr).toContain('is not a git worktree');
+    });
+});
+
+describe('wt pr argument parsing', () => {
+    let ctx: TestContext;
+
+    beforeEach(async () => {
+        ctx = await createTestRepo();
+    });
+
+    afterEach(async () => {
+        await ctx.cleanup();
+    });
+
+    it('rejects an argument that is neither a number nor a URL', async () => {
+        // Parsing and rejection happen before any network/CLI call.
+        const result = await runCli(['pr', 'not-a-pr'], ctx.repoDir);
+        expect(result.exitCode).toBe(1);
+        expect(result.stderr).toContain('is not a valid');
+    });
+
+    it('rejects a PR URL that points to a different repository (offline)', async () => {
+        await execa('git', ['remote', 'add', 'origin', 'https://github.com/realowner/realrepo.git'], { cwd: ctx.repoDir });
+
+        const result = await runCli(
+            ['pr', 'https://github.com/someone-else/other-repo/pull/1'],
+            ctx.repoDir
+        );
+        expect(result.exitCode).toBe(1);
+        expect(result.stderr).toContain('someone-else/other-repo');
+        expect(result.stderr).toContain('realowner/realrepo');
+    });
+});

@@ -124,7 +124,7 @@ program
   .command("pr")
   .argument(
     "[prNumber]",
-    "GitHub PR or GitLab MR number to create a worktree from"
+    "GitHub PR / GitLab MR to create a worktree from: a number, #123, or a PR/MR URL"
   )
   .option(
     "-p, --path <path>",
@@ -153,7 +153,10 @@ program
 
 program
   .command("open")
-  .argument("[pathOrBranch]", "Path to worktree or branch name to open")
+  .argument(
+    "[target]",
+    "Worktree to open: a path, branch name, worktree folder name, PR/MR number (#123 or 123), or a PR/MR URL"
+  )
   .option(
     "-e, --editor <editor>",
     "Editor to use for opening the worktree (overrides default editor)"
