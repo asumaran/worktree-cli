@@ -17,6 +17,7 @@ import { openWorktreeHandler } from "./commands/open.js";
 import { extractWorktreeHandler } from "./commands/extract.js";
 import { cdWorktreeHandler } from "./commands/cd.js";
 import { pathWorktreeHandler } from "./commands/path.js";
+import { completionHandler, completionCandidatesHandler } from "./commands/completion.js";
 
 // Read the version from package.json so `wt --version` always matches the
 // published release (CI sets the package version from the release tag).
@@ -200,6 +201,18 @@ program
     "Extract an existing branch as a new worktree. If no branch is specified, extracts the current branch."
   )
   .action(extractWorktreeHandler);
+
+program
+  .command("completion")
+  .argument("<shell>", "Shell to generate a completion script for (zsh, bash, or fish)")
+  .description("Print a shell completion script. See its output header for install instructions.")
+  .action(completionHandler);
+
+// Hidden helper invoked by the generated completion scripts to list dynamic
+// candidates (worktrees/branches) for a subcommand's first argument.
+program
+  .command("__complete <command> [current]", { hidden: true })
+  .action((command: string) => completionCandidatesHandler(command));
 
 program
   .command("config")

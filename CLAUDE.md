@@ -17,8 +17,9 @@ registry); installed globally with `pnpm add -g <release-tarball-url>`.
 - `src/index.ts` — entry point; registers every command on the `commander`
   program. The `bin` is `wt` → `build/index.js`.
 - `src/commands/*.ts` — one file per subcommand (new, setup, list, remove,
-  merge, purge, pr, open, path, cd, extract, config). Each exports a
-  `*Handler`.
+  merge, purge, pr, open, path, cd, extract, config, completion). Each exports a
+  `*Handler`. `completion.ts` also exports `completionCandidatesHandler`, backing
+  the hidden `wt __complete <command>` helper the generated shell scripts call.
 - `src/utils/*.ts` — shared helpers: `git.ts` (all git plumbing),
   `paths.ts` (worktree path/name resolution), `atomic.ts` (create-with-rollback),
   `pr.ts` (PR/MR reference parsing + repo-ownership validation, shared by
@@ -78,6 +79,23 @@ fetches: for a PR with no worktree it points at `wt pr`, and for a local branch
 with no worktree it points at `wt new`. PR reference parsing and repo-ownership
 validation for URLs live in `src/utils/pr.ts` and are shared with `wt pr`, which
 accepts the same `#123`/`123`/URL forms.
+
+## Shell completion (`src/commands/completion.ts`)
+
+`wt completion <zsh|bash|fish>` prints a static script; that script calls the
+hidden `wt __complete <command>` helper on Tab to list dynamic candidates. The
+`ARGUMENT_COMPLETIONS` map is the single source of truth for which subcommand's
+first argument completes to what: `worktrees` (open/cd), `worktrees-no-main`
+(remove/rm), or `branches` (merge/new/setup/path/extract). Candidates are
+emitted as `value<TAB>description` (the description is an optional hint shown by
+zsh/fish, dropped by bash): the `worktrees` kinds list one row per worktree
+keyed by its **folder name**, hinting the branch (`(main)` for the main
+worktree); the `branches` kind lists branch names, hinting the worktree folder
+for branches that already have one. `__complete` must **never throw or exit
+non-zero** (a failure would disrupt the user's shell), so `candidatesFor`
+swallows errors and returns `[]`, and the handler always `process.exit(0)`. When
+adding a subcommand that takes a worktree/branch argument, add it to both
+`ARGUMENT_COMPLETIONS` and `SUBCOMMANDS`.
 
 ## Testing
 

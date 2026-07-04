@@ -12,6 +12,7 @@ A CLI tool for managing Git worktrees and opening them in your editor of choice.
 - **Stash-aware**: Gracefully handles dirty worktrees with stash/pop workflow
 - **PR Integration**: Create worktrees directly from GitHub PRs or GitLab MRs
 - **Setup Automation**: Run setup scripts automatically with trust-based security
+- **Shell Completion**: Tab-completion of worktrees and branches for zsh, bash, and fish
 
 ## Installation
 
@@ -343,6 +344,50 @@ The `wt merge` command now follows these safer defaults:
 2. **Worktree Preservation**: Keeps the source worktree after merge (use `--remove` to clean up)
 
 This prevents the previous destructive behavior where uncommitted changes were auto-committed with generic messages and worktrees were automatically deleted.
+
+### Shell completion
+
+`wt completion <shell>` prints a completion script for `zsh`, `bash`, or `fish`.
+Pressing <kbd>Tab</kbd> after a subcommand suggests the values that command
+actually accepts: existing worktrees for `open`, `cd`, and `remove`; local
+branches for `new`, `setup`, `extract`, `path`, and `merge`.
+
+```bash
+wt open <Tab>     # suggests your existing worktrees
+wt new  <Tab>     # suggests local branch names
+```
+
+Install it for your shell:
+
+```bash
+# zsh — write it into a directory on your $fpath, then restart the shell
+wt completion zsh > "${fpath[1]}/_wt" && exec zsh
+# or source it directly from ~/.zshrc
+source <(wt completion zsh)
+
+# bash — source it directly, or persist it in ~/.bashrc
+source <(wt completion bash)
+
+# fish
+wt completion fish > ~/.config/fish/completions/wt.fish
+```
+
+Each script's output starts with a header comment repeating these install
+instructions. Candidates are computed on demand from the current repository, so
+completion always reflects the worktrees and branches you have right now.
+
+In zsh and fish, candidates carry a short hint:
+
+- `open`/`cd`/`remove` list one row per worktree. The value is the worktree
+  **folder name**, hinted with its branch (and `(main)` for the main worktree).
+- Branch commands (`new`, `setup`, `extract`, `path`, `merge`) list branch
+  names; a branch that already has a worktree is hinted with that worktree's
+  folder name, so you can tell it apart from branches with none.
+
+Pair the zsh completion with a fuzzy menu such as
+[`fzf-tab`](https://github.com/Aloxaf/fzf-tab) to search these candidates
+interactively; fzf-tab matches against the whole row, so you can filter by
+either the folder or the branch.
 
 ### Configure Default Editor
 

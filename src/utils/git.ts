@@ -411,6 +411,30 @@ export async function localBranchExists(branch: string, cwd: string = "."): Prom
 }
 
 /**
+ * List all local branches (short names, e.g. "main", "feature/foo").
+ *
+ * Used by shell completion. Returns an empty array on any failure so it never
+ * breaks a completion invocation.
+ *
+ * @param cwd - Working directory to run git command from
+ * @returns Array of local branch names (unsorted, as git lists them)
+ */
+export async function getLocalBranches(cwd: string = "."): Promise<string[]> {
+    try {
+        const { stdout } = await execa("git", [
+            "-C",
+            cwd,
+            "for-each-ref",
+            "--format=%(refname:short)",
+            "refs/heads",
+        ]);
+        return stdout.split("\n").map(b => b.trim()).filter(Boolean);
+    } catch {
+        return [];
+    }
+}
+
+/**
  * Find a worktree by path
  *
  * @param path - Path to find (will be compared against worktree paths)
