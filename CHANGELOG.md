@@ -1,3 +1,8 @@
+## v1.4.0 (2026-07-04)
+
+* feat(completion): add shell completion for zsh, bash, and fish (b552ea8)
+* ci: bump workflow actions and Node to 24 (f3fcc5b)
+
 ## v1.3.0 (2026-07-02)
 
 * feat(open): resolve worktrees by folder name, PR id, and PR/MR URL (1886b64)
