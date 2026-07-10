@@ -278,6 +278,60 @@ describe('wt remove', () => {
         const worktreeExists = await stat(worktreePath).then(() => true).catch(() => false);
         expect(worktreeExists).toBe(false);
     });
+
+    it('should remove a worktree by its folder name (basename)', async () => {
+        // Folder name differs from the branch name: branch is "feature/by-folder"
+        // but the directory is "custom-folder". `wt remove` must resolve the
+        // folder name, matching `wt open` and the shell completion suggestions.
+        const worktreePath = join(ctx.testDir, 'custom-folder');
+
+        await runCli(
+            ['new', 'feature/by-folder', '--path', worktreePath, '--editor', 'none'],
+            ctx.repoDir
+        );
+
+        // Pass just the folder name (not the branch, not a path).
+        const result = await runCli(
+            ['remove', 'custom-folder', '--force'],
+            ctx.repoDir
+        );
+
+        expect(result.exitCode).toBe(0);
+        expect(result.stdout).toContain('removed successfully');
+
+        const worktreeExists = await stat(worktreePath).then(() => true).catch(() => false);
+        expect(worktreeExists).toBe(false);
+    });
+
+    it('should refuse to remove an ambiguous folder name instead of guessing', async () => {
+        // Two worktrees of the same repo can share a basename when they live
+        // under different parent directories. Removing the wrong one would be
+        // destructive, so resolution must fail loudly and force the user to
+        // disambiguate rather than silently pick the first match.
+        const parentA = join(ctx.testDir, 'a');
+        const parentB = join(ctx.testDir, 'b');
+        await mkdir(parentA, { recursive: true });
+        await mkdir(parentB, { recursive: true });
+
+        const wtA = join(parentA, 'dup');
+        const wtB = join(parentB, 'dup');
+
+        await runCli(['new', 'feature/dup-a', '--path', wtA, '--editor', 'none'], ctx.repoDir);
+        await runCli(['new', 'feature/dup-b', '--path', wtB, '--editor', 'none'], ctx.repoDir);
+
+        const result = await runCli(['remove', 'dup', '--force'], ctx.repoDir);
+
+        expect(result.exitCode).toBe(1);
+        expect(result.stderr).toContain('ambiguous');
+
+        // Both worktrees must still exist: nothing was removed.
+        expect(await stat(wtA).then(() => true).catch(() => false)).toBe(true);
+        expect(await stat(wtB).then(() => true).catch(() => false)).toBe(true);
+
+        // Cleanup
+        await execa('git', ['worktree', 'remove', '--force', wtA], { cwd: ctx.repoDir }).catch(() => {});
+        await execa('git', ['worktree', 'remove', '--force', wtB], { cwd: ctx.repoDir }).catch(() => {});
+    });
 });
 
 describe('Bare Repository Support', () => {

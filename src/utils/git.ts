@@ -477,14 +477,32 @@ export async function findWorktreeByPath(targetPath: string, cwd: string = "."):
  * This matches the folder name that `wt new` produces (e.g.
  * "<repo>-<sanitized-branch>"), which is often different from the branch name.
  *
+ * Folder names are usually unique within a repo, but git allows two worktrees
+ * of the same repo to share a basename if they live under different parent
+ * directories (e.g. one created with the default path and another with an
+ * explicit `--path`). Resolving the wrong one would be destructive for
+ * `wt remove`, so when the name is ambiguous this throws instead of silently
+ * picking the first match, forcing the caller to disambiguate with the branch
+ * name or full path.
+ *
  * @param name - Folder name to match against each worktree's directory basename
  * @param cwd - Working directory to run git command from
- * @returns WorktreeInfo if found, null otherwise
+ * @returns WorktreeInfo if exactly one worktree matches, null if none match
+ * @throws if more than one worktree shares the given folder name
  */
 export async function findWorktreeByFolderName(name: string, cwd: string = "."): Promise<WorktreeInfo | null> {
     const worktrees = await getWorktrees(cwd);
     const { basename } = await import('node:path');
-    return worktrees.find(wt => basename(wt.path) === name) || null;
+    const matches = worktrees.filter(wt => basename(wt.path) === name);
+    if (matches.length === 0) return null;
+    if (matches.length > 1) {
+        const paths = matches.map(wt => `  ${wt.path}`).join('\n');
+        throw new Error(
+            `Folder name "${name}" is ambiguous; it matches ${matches.length} worktrees:\n${paths}\n` +
+            `Disambiguate with the branch name or the full path.`
+        );
+    }
+    return matches[0];
 }
 
 /**

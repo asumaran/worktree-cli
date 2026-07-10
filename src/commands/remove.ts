@@ -1,8 +1,7 @@
 import { execa } from "execa";
 import chalk from "chalk";
 import { stat, rm } from "node:fs/promises";
-import { resolve } from "node:path";
-import { getWorktrees, findWorktreeByBranch, findWorktreeByPath, WorktreeInfo } from "../utils/git.js";
+import { findWorktreeByBranch, findWorktreeByPath, findWorktreeByFolderName, WorktreeInfo } from "../utils/git.js";
 import { selectWorktree, confirm } from "../utils/tui.js";
 import { withSpinner } from "../utils/spinner.js";
 
@@ -42,6 +41,13 @@ export async function removeWorktreeHandler(
             // If not found by path, try by branch name
             if (!targetWorktree) {
                 targetWorktree = await findWorktreeByBranch(pathOrBranch);
+            }
+
+            // Finally, try by worktree folder name (basename), matching the
+            // resolution order of `wt open` and the folder names the shell
+            // completion suggests. Throws if the folder name is ambiguous.
+            if (!targetWorktree) {
+                targetWorktree = await findWorktreeByFolderName(pathOrBranch);
             }
 
             if (!targetWorktree) {
