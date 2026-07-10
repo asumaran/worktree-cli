@@ -1,3 +1,7 @@
+## v1.5.0 (2026-07-10)
+
+* feat(remove): resolve worktrees by folder name (961bca8)
+
 ## v1.4.0 (2026-07-04)
 
 * feat(completion): add shell completion for zsh, bash, and fish (b552ea8)
