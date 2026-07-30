@@ -1,5 +1,6 @@
 import { execa } from "execa";
 import chalk from "chalk";
+import { dirname } from "node:path";
 
 export async function getCurrentBranch(cwd: string = "."): Promise<string | null> {
     try {
@@ -157,6 +158,26 @@ export async function getRepoRoot(cwd: string = "."): Promise<string | null> {
         return stdout.trim();
     } catch (error) {
         console.error(chalk.yellow("Could not determine repository root."), error);
+        return null;
+    }
+}
+
+/**
+ * Determine the root of the MAIN checkout, even when called from inside a
+ * linked worktree. `--git-common-dir` always points at the main checkout's
+ * `.git` directory, so its parent is the main repository root. This is what
+ * setup scripts should use for `$ROOT_WORKTREE_PATH`, since untracked files
+ * like `worktrees.json` only exist in the main checkout.
+ *
+ * @param cwd - Path of the working directory to query (defaults to the current directory)
+ * @returns The absolute path to the main checkout's root, or `null` if it cannot be determined
+ */
+export async function getMainRepoRoot(cwd: string = "."): Promise<string | null> {
+    try {
+        const { stdout } = await execa("git", ["-C", cwd, "rev-parse", "--path-format=absolute", "--git-common-dir"]);
+        return dirname(stdout.trim());
+    } catch (error) {
+        console.error(chalk.yellow("Could not determine main repository root."), error);
         return null;
     }
 }

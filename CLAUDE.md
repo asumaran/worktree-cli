@@ -52,7 +52,8 @@ Run a single test file: `pnpm test -- path.test.ts`.
   message with `chalk`, and call `process.exit(1)` on failure (or `exit(0)` on a
   user-cancelled prompt). Keep this pattern; don't throw past the handler.
 - Worktree creation goes through `AtomicWorktreeOperation` (`atomic.ts`) so a
-  failure rolls back; preserve that when touching `new`/`setup`/`pr`/`extract`.
+  failure rolls back; preserve that when touching `new`/`pr`/`extract`.
+  (`setup` no longer creates worktrees; it only re-runs setup scripts.)
 - Dirty main-worktree handling uses stash-by-hash: `stashChanges` →
   `applyAndDropStash` (see `git.ts`/`workflow.ts`). It uses `git stash create`
   (a dangling commit), not the stash stack.

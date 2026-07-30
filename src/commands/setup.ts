@@ -1,198 +1,115 @@
 import { execa } from "execa";
 import chalk from "chalk";
 import { stat } from "node:fs/promises";
-import { resolve, join } from "node:path";
-import { getDefaultEditor, shouldSkipEditor } from "../config.js";
-import {
-    isWorktreeClean,
-    isMainRepoBare,
-    stashChanges,
-    applyAndDropStash,
-    getUpstreamRemote,
-} from "../utils/git.js";
+import { getMainRepoRoot, getRepoRoot, getWorktrees } from "../utils/git.js";
 import { resolveWorktreePath, validateBranchName } from "../utils/paths.js";
-import { AtomicWorktreeOperation } from "../utils/atomic.js";
-import { handleDirtyState } from "../utils/tui.js";
-import { runSetupScriptsSecure } from "../utils/setup.js";
-import { onShutdown } from "../utils/shutdown.js";
-import { openInHerdr } from "../utils/herdr.js";
+import { loadSetupCommands, executeSetupCommands } from "../utils/setup.js";
+import { confirmCommands } from "../utils/tui.js";
 
+/**
+ * (Re)provision existing worktrees: run the setup scripts from worktrees.json
+ * or .cursor/worktrees.json inside worktrees that already exist.
+ *
+ * This command does NOT create worktrees — `wt new` does that (and runs the
+ * setup scripts on creation). Use `wt setup` to re-apply the scripts after
+ * they change, or to backfill worktrees created before the scripts existed.
+ *
+ * Target resolution:
+ * - `wt setup <branch>`: the worktree for that branch.
+ * - `wt setup` from inside a linked worktree: that worktree.
+ * - `wt setup --all`: every linked worktree of the repository.
+ */
 export async function setupWorktreeHandler(
-    branchName: string = "main",
-    options: { path?: string; checkout?: boolean; install?: string; editor?: string; trust?: boolean } = {}
+    branchName?: string,
+    options: { path?: string; all?: boolean; trust?: boolean } = {}
 ) {
-    let stashHash: string | null = null;
-    let unregisterShutdown: (() => void) | null = null;
-
     try {
         // 1. Validate we're in a git repo
         await execa("git", ["rev-parse", "--is-inside-work-tree"]);
 
-        // Validate branch name
-        const validation = validateBranchName(branchName);
-        if (!validation.isValid) {
-            console.error(chalk.red(`Error: ${validation.error}`));
+        // 2. Resolve the main checkout root; the setup file lives there and
+        // $ROOT_WORKTREE_PATH must point at it.
+        const mainRoot = await getMainRepoRoot();
+        if (!mainRoot) {
+            console.error(chalk.red("Could not determine the main repository root."));
             process.exit(1);
         }
 
-        // 2. Check if this is a bare repository
-        const isBare = await isMainRepoBare();
+        const setup = await loadSetupCommands(mainRoot);
+        if (!setup) {
+            console.error(chalk.yellow("No setup file found (.cursor/worktrees.json or worktrees.json)."));
+            console.log(chalk.yellow("Tip: Create a worktrees.json file in the main checkout to automate setup commands."));
+            process.exit(1);
+        }
 
-        // 3. Check if main worktree is clean (skip for bare repos)
-        if (!isBare) {
-            console.log(chalk.blue("Checking if main worktree is clean..."));
-            const isClean = await isWorktreeClean(".");
+        // 3. Resolve target worktrees
+        let targets: string[] = [];
 
-            if (!isClean) {
-                const action = await handleDirtyState(
-                    "Your main worktree has uncommitted changes."
-                );
+        if (options.all) {
+            const worktrees = await getWorktrees(mainRoot);
+            targets = worktrees
+                .filter((w) => !w.isMain && !w.prunable && !w.bare)
+                .map((w) => w.path);
 
-                if (action === 'abort') {
-                    console.log(chalk.yellow("Operation cancelled."));
-                    process.exit(0);
-                } else if (action === 'stash') {
-                    console.log(chalk.blue("Stashing your changes..."));
-                    stashHash = await stashChanges(".", `wt-setup: Before creating worktree for ${branchName}`);
-                    if (stashHash) {
-                        console.log(chalk.green("Changes stashed successfully."));
-                        // Register SIGINT handler to restore stash if interrupted
-                        unregisterShutdown = onShutdown(async () => {
-                            if (stashHash) {
-                                console.log(chalk.blue("Restoring stashed changes due to interruption..."));
-                                await applyAndDropStash(stashHash, ".");
-                            }
-                        });
-                    }
-                } else {
-                    console.log(chalk.yellow("Proceeding with uncommitted changes..."));
-                }
+            if (targets.length === 0) {
+                console.log(chalk.yellow("No linked worktrees found for this repository."));
+                return;
+            }
+        } else if (branchName) {
+            const validation = validateBranchName(branchName);
+            if (!validation.isValid) {
+                console.error(chalk.red(`Error: ${validation.error}`));
+                process.exit(1);
+            }
+
+            const resolvedPath = await resolveWorktreePath(branchName, {
+                customPath: options.path,
+                cwd: mainRoot,
+                useRepoNamespace: true,
+            });
+
+            try {
+                await stat(resolvedPath);
+            } catch {
+                console.error(chalk.red(`Worktree does not exist at: ${resolvedPath}`));
+                console.log(chalk.yellow(`Create it first with: wt new ${branchName}`));
+                process.exit(1);
+            }
+
+            targets = [resolvedPath];
+        } else {
+            // No branch given: target the current worktree, if we're inside one.
+            const cwdRoot = await getRepoRoot();
+            if (cwdRoot && cwdRoot !== mainRoot) {
+                targets = [cwdRoot];
             } else {
-                console.log(chalk.green("Main worktree is clean."));
+                console.error(chalk.red("You are in the main checkout. Pass a branch name, use --all, or run this from inside a worktree."));
+                process.exit(1);
             }
         }
 
-        // 4. Build final path for the new worktree
-        const resolvedPath = await resolveWorktreePath(branchName, {
-            customPath: options.path,
-            useRepoNamespace: true,
+        // 4. Confirm once, then run in every target
+        console.log(chalk.blue(`Found setup file: ${setup.filePath}`));
+        const shouldRun = await confirmCommands(setup.commands, {
+            title: `The following setup commands will run in ${targets.length} worktree${targets.length === 1 ? "" : "s"}:`,
+            trust: options.trust,
         });
 
-        // Check if directory already exists
-        let directoryExists = false;
-        try {
-            await stat(resolvedPath);
-            directoryExists = true;
-        } catch {
-            // Directory doesn't exist, continue with creation
+        if (!shouldRun) {
+            console.log(chalk.yellow("Setup commands skipped."));
+            return;
         }
 
-        // 5. Check if branch exists
-        const remote = await getUpstreamRemote();
-        const { stdout: localBranches } = await execa("git", ["branch", "--list", branchName]);
-        const { stdout: remoteBranches } = await execa("git", ["branch", "-r", "--list", `${remote}/${branchName}`]);
-        const branchExists = !!localBranches || !!remoteBranches;
-
-        // 6. Create the new worktree or open the editor if it already exists
-        if (directoryExists) {
-            console.log(chalk.yellow(`Directory already exists at: ${resolvedPath}`));
-
-            let isGitWorktree = false;
-            try {
-                await stat(join(resolvedPath, ".git"));
-                isGitWorktree = true;
-            } catch {
-                // Not a git worktree
-            }
-
-            if (isGitWorktree) {
-                console.log(chalk.green(`Using existing worktree at: ${resolvedPath}`));
-            } else {
-                console.log(chalk.yellow(`Warning: Directory exists but is not a git worktree.`));
-            }
-        } else {
-            console.log(chalk.blue(`Creating new worktree for branch "${branchName}" at: ${resolvedPath}`));
-
-            const atomic = new AtomicWorktreeOperation();
-
-            try {
-                if (!branchExists) {
-                    console.log(chalk.yellow(`Branch "${branchName}" doesn't exist. Creating new branch with worktree...`));
-                    await atomic.createWorktree(resolvedPath, branchName, true);
-                } else {
-                    console.log(chalk.green(`Using existing branch "${branchName}".`));
-                    await atomic.createWorktree(resolvedPath, branchName, false);
-                }
-
-                // 7. Execute setup-worktree commands if setup file exists
-                // Improvement #6: Replace regex security with trust model
-                const setupRan = await runSetupScriptsSecure(resolvedPath, {
-                    trust: options.trust,
-                });
-
-                if (!setupRan) {
-                    console.log(chalk.yellow("No setup file found (.cursor/worktrees.json or worktrees.json)."));
-                    console.log(chalk.yellow("Tip: Create a worktrees.json file to automate setup commands."));
-                }
-
-                // 8. Install dependencies if specified
-                if (options.install) {
-                    await atomic.runInstall(options.install, resolvedPath);
-                }
-
-                atomic.commit();
-            } catch (error: any) {
-                console.error(chalk.red("Failed to create worktree:"), error.message);
-                await atomic.rollback();
-                throw error;
-            }
+        for (const target of targets) {
+            console.log(chalk.blue(`Running setup in: ${target}`));
+            await executeSetupCommands(setup.commands, target, mainRoot);
         }
-
-        // 9. Register the worktree in herdr's sidebar (best-effort, no-op
-        // without herdr). Runs for both freshly created and reused worktrees.
-        await openInHerdr(resolvedPath);
-
-        // 10. Open in the specified editor (or use configured default)
-        const configuredEditor = getDefaultEditor();
-        const editorCommand = options.editor || configuredEditor;
-
-        if (shouldSkipEditor(editorCommand)) {
-            console.log(chalk.gray(`Editor set to 'none', skipping editor open.`));
-        } else {
-            console.log(chalk.blue(`Opening ${resolvedPath} in ${editorCommand}...`));
-            try {
-                await execa(editorCommand, [resolvedPath], { stdio: "inherit" });
-            } catch (editorError) {
-                console.error(chalk.red(`Failed to open editor "${editorCommand}". Please ensure it's installed and in your PATH.`));
-                console.warn(chalk.yellow(`Continuing without opening editor.`));
-            }
-        }
-
-        console.log(chalk.green(`Worktree ${directoryExists ? "opened" : "created"} at ${resolvedPath}.`));
-        if (!directoryExists && options.install) {
-            console.log(chalk.green(`Dependencies installed using ${options.install}.`));
-        }
-
     } catch (error) {
         if (error instanceof Error) {
-            console.error(chalk.red("Failed to create new worktree:"), error.message);
+            console.error(chalk.red("Failed to run setup scripts:"), error.message);
         } else {
-            console.error(chalk.red("Failed to create new worktree:"), error);
+            console.error(chalk.red("Failed to run setup scripts:"), error);
         }
         process.exit(1);
-    } finally {
-        // Unregister shutdown handler
-        if (unregisterShutdown) {
-            unregisterShutdown();
-        }
-
-        // Restore stashed changes if we stashed them
-        if (stashHash) {
-            console.log(chalk.blue("Restoring your stashed changes..."));
-            const restored = await applyAndDropStash(stashHash, ".");
-            if (restored) {
-                console.log(chalk.green("Changes restored successfully."));
-            }
-        }
     }
 }

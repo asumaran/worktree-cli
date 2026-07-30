@@ -13,13 +13,14 @@ import {
 import { resolveWorktreePath, validateBranchName } from "../utils/paths.js";
 import { AtomicWorktreeOperation } from "../utils/atomic.js";
 import { handleDirtyState, confirm } from "../utils/tui.js";
+import { runSetupScriptsSecure } from "../utils/setup.js";
 import { onShutdown } from "../utils/shutdown.js";
 import { openInHerdr } from "../utils/herdr.js";
 import { openWorktreeHandler } from "./open.js";
 
 export async function newWorktreeHandler(
     branchName?: string,
-    options: { path?: string; checkout?: boolean; install?: string; editor?: string; stash?: boolean } = {}
+    options: { path?: string; checkout?: boolean; install?: string; editor?: string; stash?: boolean; trust?: boolean } = {}
 ) {
     let stashHash: string | null = null;
     let unregisterShutdown: (() => void) | null = null;
@@ -127,6 +128,14 @@ export async function newWorktreeHandler(
                 console.log(chalk.green(`Using existing branch "${branchName}".`));
                 await atomic.createWorktree(resolvedPath, branchName, false);
             }
+
+            // Execute setup-worktree commands if a setup file exists
+            // (worktrees.json or .cursor/worktrees.json). Silent no-op
+            // otherwise. Runs before dependency installation so copied config
+            // files (.npmrc, .env, ...) are in place for the install.
+            await runSetupScriptsSecure(resolvedPath, {
+                trust: options.trust,
+            });
 
             // Run install if specified
             if (options.install) {

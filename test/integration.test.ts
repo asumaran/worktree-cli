@@ -602,3 +602,110 @@ describe('wt pr argument parsing', () => {
         expect(result.stderr).toContain('realowner/realrepo');
     });
 });
+
+describe('setup scripts (worktrees.json)', () => {
+    let ctx: TestContext;
+
+    /** Write a worktrees.json whose only command copies marker.txt from the main checkout. */
+    async function writeSetupFile(repoDir: string): Promise<void> {
+        await writeFile(
+            join(repoDir, 'worktrees.json'),
+            JSON.stringify({
+                'setup-worktree': ['cp "$ROOT_WORKTREE_PATH/marker.txt" marker.txt'],
+            })
+        );
+    }
+
+    beforeEach(async () => {
+        ctx = await createTestRepo();
+        await writeSetupFile(ctx.repoDir);
+        // The marker and the setup file stay untracked, like real gitignored
+        // local config: worktrees must receive them via the setup commands.
+        await writeFile(join(ctx.repoDir, 'marker.txt'), 'v1');
+        await writeFile(join(ctx.repoDir, '.git', 'info', 'exclude'), 'worktrees.json\nmarker.txt\n');
+    });
+
+    afterEach(async () => {
+        await ctx.cleanup();
+    });
+
+    it('wt new runs the setup scripts on creation with --trust', async () => {
+        const worktreePath = join(ctx.testDir, 'wt-a');
+        const result = await runCli(
+            ['new', 'feature/setup-a', '-c', '--path', worktreePath, '--editor', 'none', '--trust'],
+            ctx.repoDir
+        );
+        expect(result.exitCode).toBe(0);
+
+        const marker = await readFile(join(worktreePath, 'marker.txt'), 'utf-8');
+        expect(marker).toBe('v1');
+    });
+
+    it('wt setup re-runs the scripts on an existing worktree', async () => {
+        const worktreePath = join(ctx.testDir, 'wt-b');
+        await runCli(
+            ['new', 'feature/setup-b', '-c', '--path', worktreePath, '--editor', 'none', '--trust'],
+            ctx.repoDir
+        );
+
+        // Change the source file in the main checkout, then re-provision.
+        await writeFile(join(ctx.repoDir, 'marker.txt'), 'v2');
+        const result = await runCli(
+            ['setup', 'feature/setup-b', '--path', worktreePath, '--trust'],
+            ctx.repoDir
+        );
+        expect(result.exitCode).toBe(0);
+
+        const marker = await readFile(join(worktreePath, 'marker.txt'), 'utf-8');
+        expect(marker).toBe('v2');
+    });
+
+    it('wt setup with no argument targets the current worktree', async () => {
+        const worktreePath = join(ctx.testDir, 'wt-c');
+        await runCli(
+            ['new', 'feature/setup-c', '-c', '--path', worktreePath, '--editor', 'none', '--trust'],
+            ctx.repoDir
+        );
+
+        await writeFile(join(ctx.repoDir, 'marker.txt'), 'v2');
+        // Run from inside the worktree: the setup file and $ROOT_WORKTREE_PATH
+        // must still resolve to the main checkout.
+        const result = await runCli(['setup', '--trust'], worktreePath);
+        expect(result.exitCode).toBe(0);
+
+        const marker = await readFile(join(worktreePath, 'marker.txt'), 'utf-8');
+        expect(marker).toBe('v2');
+    });
+
+    it('wt setup --all re-provisions every linked worktree', async () => {
+        const pathA = join(ctx.testDir, 'wt-all-a');
+        const pathB = join(ctx.testDir, 'wt-all-b');
+        await runCli(['new', 'feature/all-a', '-c', '--path', pathA, '--editor', 'none', '--trust'], ctx.repoDir);
+        await runCli(['new', 'feature/all-b', '-c', '--path', pathB, '--editor', 'none', '--trust'], ctx.repoDir);
+
+        await writeFile(join(ctx.repoDir, 'marker.txt'), 'v3');
+        const result = await runCli(['setup', '--all', '--trust'], ctx.repoDir);
+        expect(result.exitCode).toBe(0);
+
+        expect(await readFile(join(pathA, 'marker.txt'), 'utf-8')).toBe('v3');
+        expect(await readFile(join(pathB, 'marker.txt'), 'utf-8')).toBe('v3');
+    });
+
+    it('wt setup does not create worktrees', async () => {
+        const worktreePath = join(ctx.testDir, 'wt-missing');
+        const result = await runCli(
+            ['setup', 'feature/missing', '--path', worktreePath, '--trust'],
+            ctx.repoDir
+        );
+        expect(result.exitCode).toBe(1);
+        expect(result.stderr).toContain('Worktree does not exist');
+        expect(result.stdout).toContain('wt new feature/missing');
+        await expect(stat(worktreePath)).rejects.toThrow();
+    });
+
+    it('wt setup from the main checkout without arguments fails with guidance', async () => {
+        const result = await runCli(['setup', '--trust'], ctx.repoDir);
+        expect(result.exitCode).toBe(1);
+        expect(result.stderr).toContain('main checkout');
+    });
+});

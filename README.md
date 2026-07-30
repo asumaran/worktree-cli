@@ -79,11 +79,17 @@ new release is a separate step — run `scripts/update-local.sh` (see
 ```bash
 wt new <branchName> [options]
 ```
+
+If the repository has a `worktrees.json` or `.cursor/worktrees.json`, its setup
+commands run after the worktree is created (shown first and requiring
+confirmation, unless `--trust` is passed).
+
 Options:
 - `-p, --path <path>`: Specify a custom path for the worktree
 - `-c, --checkout`: Create new branch if it doesn't exist and checkout automatically
 - `-i, --install <packageManager>`: Package manager to use for installing dependencies (npm, pnpm, bun, etc.)
 - `-e, --editor <editor>`: Editor to use for opening the worktree (overrides default editor)
+- `-t, --trust`: Trust and run setup commands without confirmation (for CI environments)
 
 Example:
 ```bash
@@ -99,26 +105,38 @@ wt new feature/vscode -e code
 - **Abort**: Cancel the operation
 - **Continue anyway**: Proceed with uncommitted changes
 
-### Create a new worktree with setup scripts
+### Re-run setup scripts on existing worktrees
 
 ```bash
-wt setup <branchName> [options]
+wt setup [branchName] [options]
 ```
 
-Creates a new worktree and automatically runs setup commands from `worktrees.json` or `.cursor/worktrees.json`. This is useful for automating dependency installation, copying configuration files, or running custom setup scripts.
+(Re)provisions worktrees that already exist: runs the setup commands from
+`worktrees.json` or `.cursor/worktrees.json` inside them. Useful after the
+setup commands change, or to backfill worktrees created before the setup file
+existed. It does **not** create worktrees — `wt new` does that (and runs the
+setup scripts on creation).
+
+Target resolution:
+- `wt setup <branchName>`: the worktree for that branch.
+- `wt setup` (no argument) from inside a linked worktree: that worktree.
+- `wt setup --all`: every linked worktree of the repository.
+
+The setup file is read from the **main checkout** (it is typically untracked),
+and `$ROOT_WORKTREE_PATH` always points at the main checkout, regardless of
+where the command runs. Setup commands should be idempotent, since they may run
+multiple times over the same worktree.
 
 Options:
-- `-p, --path <path>`: Specify a custom path for the worktree
-- `-c, --checkout`: Create new branch if it doesn't exist and checkout automatically
-- `-i, --install <packageManager>`: Package manager to use for installing dependencies (npm, pnpm, bun, etc.)
-- `-e, --editor <editor>`: Editor to use for opening the worktree (overrides default editor)
+- `-a, --all`: Run the setup scripts in every linked worktree of the repository
+- `-p, --path <path>`: Custom path of the target worktree
 - `-t, --trust`: Trust and run setup commands without confirmation (for CI environments)
 
 Example:
 ```bash
-wt setup feature/new-feature
-wt setup feature/quick-start -i pnpm
-wt setup feature/ci-build --trust  # Skip confirmation in CI
+wt setup feature/new-feature        # re-provision one worktree
+wt setup                            # re-provision the worktree you're in
+wt setup --all --trust              # re-provision everything, no confirmation
 ```
 
 ### Create a new worktree from Pull Request / Merge Request
@@ -516,14 +534,14 @@ WT_DISABLE_HERDR=1 wt new feature/login
 
 ### Setup Worktree Configuration
 
-You can define setup commands in one of two locations to automatically execute them when using `wt setup`:
+You can define setup commands in one of two locations:
 
 1. **Cursor's format**: `.cursor/worktrees.json` in the repository root
 2. **Generic format**: `worktrees.json` in the repository root
 
-The tool checks for `.cursor/worktrees.json` first, then falls back to `worktrees.json`.
+The tool checks for `.cursor/worktrees.json` first, then falls back to `worktrees.json`. The file is resolved against the **main checkout**, so it can be untracked (or ignored via `.git/info/exclude`) and still apply to every worktree.
 
-**Note:** Setup scripts only run when using the `wt setup` command. The `wt new` command will not execute setup scripts.
+Setup scripts run automatically when a worktree is created (`wt new`, `wt pr -s`), and can be re-applied to existing worktrees with `wt setup`. Because of that, commands should be **idempotent** (safe to run more than once over the same worktree).
 
 #### Format Options:
 
@@ -557,16 +575,16 @@ Setup commands use a **trust-based security model**:
 
 ```bash
 # Interactive confirmation (default)
-wt setup feature/new
+wt new feature/new
 
 # Trust mode for CI/scripts
-wt setup feature/new --trust
+wt new feature/new --trust
 ```
 
 #### Execution Details
 
-- Commands are executed in the new worktree directory
-- The `$ROOT_WORKTREE_PATH` environment variable is available, pointing to the main repository root
+- Commands are executed in the target worktree directory
+- The `$ROOT_WORKTREE_PATH` environment variable is available, pointing to the main checkout's root (even when the command runs from inside a worktree)
 - Commands run with shell execution, so complex commands and piping are supported
 - If a command fails, the error is logged, but setup continues with the next command
 - The setup runs after worktree creation but before dependency installation (if `--install` is used)

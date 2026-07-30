@@ -3,7 +3,7 @@ import chalk from "chalk";
 import { stat } from "node:fs/promises";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { getRepoRoot } from "./git.js";
+import { getRepoRoot, getMainRepoRoot } from "./git.js";
 import { createSpinner } from "./spinner.js";
 import { confirmCommands } from "./tui.js";
 
@@ -15,7 +15,7 @@ interface WorktreeSetupData {
 /**
  * Load and parse setup commands from worktrees.json
  */
-async function loadSetupCommands(repoRoot: string): Promise<{ commands: string[]; filePath: string } | null> {
+export async function loadSetupCommands(repoRoot: string): Promise<{ commands: string[]; filePath: string } | null> {
     // Check for .cursor/worktrees.json first
     const cursorSetupPath = join(repoRoot, ".cursor", "worktrees.json");
     try {
@@ -79,7 +79,10 @@ export async function runSetupScriptsSecure(
     worktreePath: string,
     options: { trust?: boolean } = {}
 ): Promise<boolean> {
-    const repoRoot = await getRepoRoot();
+    // Resolve the MAIN checkout root (not the current worktree's root): the
+    // setup file is typically untracked and only exists in the main checkout,
+    // and $ROOT_WORKTREE_PATH must point there for copy-style commands.
+    const repoRoot = await getMainRepoRoot();
     if (!repoRoot) {
         console.warn(chalk.yellow("Could not determine repository root. Skipping setup scripts."));
         return false;
@@ -104,9 +107,22 @@ export async function runSetupScriptsSecure(
         return false;
     }
 
-    // Execute commands
-    const env = { ...process.env, ROOT_WORKTREE_PATH: repoRoot };
-    for (const command of setupResult.commands) {
+    await executeSetupCommands(setupResult.commands, worktreePath, repoRoot);
+    return true;
+}
+
+/**
+ * Execute setup commands inside a worktree, with $ROOT_WORKTREE_PATH pointing
+ * at the main checkout. No confirmation happens here: callers must have
+ * already confirmed the commands (see confirmCommands / the trust model).
+ */
+export async function executeSetupCommands(
+    commands: string[],
+    worktreePath: string,
+    mainRepoRoot: string
+): Promise<void> {
+    const env = { ...process.env, ROOT_WORKTREE_PATH: mainRepoRoot };
+    for (const command of commands) {
         console.log(chalk.gray(`Executing: ${command}`));
         try {
             await execa(command, { shell: true, cwd: worktreePath, env, stdio: "inherit" });
@@ -120,7 +136,6 @@ export async function runSetupScriptsSecure(
         }
     }
     console.log(chalk.green("Setup commands completed."));
-    return true;
 }
 
 /**

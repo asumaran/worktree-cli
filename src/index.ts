@@ -50,27 +50,24 @@ program
     "-e, --editor <editor>",
     "Editor to use for opening the worktree (e.g., code, webstorm, windsurf, etc.)"
   )
+  .option(
+    "-t, --trust",
+    "Trust and run setup commands without confirmation (for CI environments)",
+    false
+  )
   .description(
-    "Create a new worktree for the specified branch, install dependencies if specified, and open in editor."
+    "Create a new worktree for the specified branch, run setup scripts from worktrees.json if present, install dependencies if specified, and open in editor."
   )
   .action(newWorktreeHandler);
 
 program
   .command("setup")
-  .argument("[branchName]", "Name of the branch to base this worktree on")
-  .option("-p, --path <path>", "Relative path/folder name for new worktree")
+  .argument("[branchName]", "Branch whose existing worktree should be (re)provisioned; defaults to the current worktree")
+  .option("-p, --path <path>", "Custom path of the target worktree")
   .option(
-    "-c, --checkout",
-    "Create new branch if it doesn't exist and checkout automatically",
+    "-a, --all",
+    "Run the setup scripts in every linked worktree of the repository",
     false
-  )
-  .option(
-    "-i, --install <packageManager>",
-    "Package manager to use for installing dependencies (npm, pnpm, bun, etc.)"
-  )
-  .option(
-    "-e, --editor <editor>",
-    "Editor to use for opening the worktree (e.g., code, webstorm, windsurf, etc.)"
   )
   .option(
     "-t, --trust",
@@ -78,7 +75,7 @@ program
     false
   )
   .description(
-    "Create a new worktree and run setup scripts from worktrees.json or .cursor/worktrees.json"
+    "Re-run setup scripts from worktrees.json or .cursor/worktrees.json in existing worktrees. Does not create worktrees; use `wt new` for that."
   )
   .action(setupWorktreeHandler);
 
