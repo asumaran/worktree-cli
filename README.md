@@ -409,7 +409,13 @@ either the folder or the branch.
 
 ### Configure Default Editor
 
-You can set a default editor to be used when creating new worktrees:
+When no editor is explicitly configured, `wt` uses your system editor: it reads
+`$VISUAL`, then `$EDITOR`, and only falls back to `cursor` when neither is set.
+Wait flags (`--wait`/`-w`) are stripped from `$VISUAL`/`$EDITOR` values, since
+`wt` opens a whole worktree and should not block until you close the editor.
+
+You can still pin a specific editor in the config, which takes precedence over
+`$VISUAL`/`$EDITOR`:
 
 ```bash
 # Set default editor
@@ -418,11 +424,14 @@ wt config set editor <editorName>
 # Examples:
 wt config set editor code     # Use VS Code
 wt config set editor webstorm # Use WebStorm
-wt config set editor cursor   # Use Cursor (default)
+wt config set editor cursor   # Use Cursor
 wt config set editor none     # Skip opening editor entirely
 
-# Get current default editor
+# Get current default editor (shows the resolved value)
 wt config get editor
+
+# Clear the stored editor (revert to $VISUAL/$EDITOR resolution)
+wt config clear editor
 
 # Show config file location
 wt config path
@@ -619,7 +628,7 @@ All worktree creation operations are atomic with automatic rollback on failure:
 
 - Git
 - Node.js
-- An editor installed and available in PATH (defaults to Cursor, can be set to `none` to skip)
+- An editor installed and available in PATH (defaults to `$VISUAL`/`$EDITOR`, then Cursor; can be set to `none` to skip)
 - **For `wt pr` command:** GitHub CLI (`gh`) or GitLab CLI (`glab`) installed and authenticated
 
 ## Development

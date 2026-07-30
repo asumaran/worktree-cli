@@ -59,7 +59,7 @@ describe('Config Management', () => {
         }
     });
 
-    async function runConfig(args: string[]): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+    async function runConfig(args: string[], extraEnv: Record<string, string | undefined> = {}): Promise<{ stdout: string; stderr: string; exitCode: number }> {
         try {
             const result = await execa('node', [CLI_PATH, 'config', ...args], {
                 reject: false,
@@ -72,6 +72,16 @@ describe('Config Management', () => {
                     WT_CONFIG_DIR: testConfigDir,
                     XDG_CONFIG_HOME: process.platform === 'win32' ? undefined : testConfigDir,
                     APPDATA: process.platform === 'win32' ? testConfigDir : undefined,
+                    // Editor resolution falls back to $VISUAL/$EDITOR, so drop
+                    // whatever the host machine has set to keep tests
+                    // deterministic (undefined entries are omitted from env).
+                    VISUAL: undefined,
+                    EDITOR: undefined,
+                    // Force plain output: a host FORCE_COLOR makes chalk emit
+                    // ANSI codes even when piped, which corrupts the config
+                    // path parsed out of stdout below.
+                    FORCE_COLOR: '0',
+                    ...extraEnv,
                 },
             });
             return {
@@ -221,13 +231,54 @@ describe('Config Management', () => {
             expect(result.stdout).toContain('vim');
         });
 
-        it('should get default editor when not explicitly set (uses default)', async () => {
+        it('should get default editor when not explicitly set (uses fallback)', async () => {
             const result = await runConfig(['get', 'editor']);
 
             expect(result.exitCode).toBe(0);
             expect(result.stdout).toContain('Default editor is currently set to');
-            // The default value from config.ts schema is 'cursor', but if a previous test
-            // set a different value, it may persist. Just check for a value.
+            // With no stored value and no $VISUAL/$EDITOR, resolution lands on
+            // the hardcoded fallback.
+            expect(result.stdout).toContain('cursor');
+        });
+
+        it('should fall back to $EDITOR when no editor is configured', async () => {
+            const result = await runConfig(['get', 'editor'], { EDITOR: 'zed' });
+
+            expect(result.exitCode).toBe(0);
+            expect(result.stdout).toContain('zed');
+        });
+
+        it('should prefer $VISUAL over $EDITOR', async () => {
+            const result = await runConfig(['get', 'editor'], { VISUAL: 'subl', EDITOR: 'vim' });
+
+            expect(result.exitCode).toBe(0);
+            expect(result.stdout).toContain('subl');
+        });
+
+        it('should strip wait flags from $VISUAL/$EDITOR values', async () => {
+            const result = await runConfig(['get', 'editor'], { EDITOR: 'zed --wait' });
+
+            expect(result.exitCode).toBe(0);
+            expect(result.stdout).toContain('zed');
+            expect(result.stdout).not.toContain('--wait');
+        });
+
+        it('should prefer the stored editor over $EDITOR', async () => {
+            await runConfig(['set', 'editor', 'webstorm']);
+
+            const result = await runConfig(['get', 'editor'], { EDITOR: 'zed' });
+
+            expect(result.exitCode).toBe(0);
+            expect(result.stdout).toContain('webstorm');
+        });
+
+        it('should prefer WT_EDITOR over the stored editor and $EDITOR', async () => {
+            await runConfig(['set', 'editor', 'webstorm']);
+
+            const result = await runConfig(['get', 'editor'], { WT_EDITOR: 'none', EDITOR: 'zed' });
+
+            expect(result.exitCode).toBe(0);
+            expect(result.stdout).toContain('none');
         });
 
         it('should get git provider', async () => {
@@ -306,11 +357,19 @@ describe('Config Management', () => {
             expect(result.stderr).toContain('unknown command');
         });
 
-        it('should fail when clearing editor (not clearable)', async () => {
+        it('should clear editor and revert to $VISUAL/$EDITOR resolution', async () => {
+            await runConfig(['set', 'editor', 'webstorm']);
+
             const result = await runConfig(['clear', 'editor']);
 
-            expect(result.exitCode).toBe(1);
-            expect(result.stderr).toContain('unknown command');
+            expect(result.exitCode).toBe(0);
+            expect(result.stdout).toContain('Default editor cleared');
+
+            const config = await getConfigFileContent();
+            expect(config.defaultEditor).toBeUndefined();
+
+            const getResult = await runConfig(['get', 'editor'], { EDITOR: 'zed' });
+            expect(getResult.stdout).toContain('zed');
         });
     });
 

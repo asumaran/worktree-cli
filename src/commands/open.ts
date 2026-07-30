@@ -2,7 +2,7 @@ import { execa } from "execa";
 import chalk from "chalk";
 import { stat } from "node:fs/promises";
 import { resolve } from "node:path";
-import { getDefaultEditor, shouldSkipEditor } from "../config.js";
+import { getDefaultEditor, shouldSkipEditor, parseEditorCommand } from "../config.js";
 import { findWorktreeByBranch, findWorktreeByPath, findWorktreeByFolderName, localBranchExists, WorktreeInfo } from "../utils/git.js";
 import { selectWorktree } from "../utils/tui.js";
 import { openInHerdr } from "../utils/herdr.js";
@@ -194,7 +194,8 @@ export async function openWorktreeHandler(
             console.log(chalk.blue(`Opening ${targetPath} in ${editorCommand}...`));
 
             try {
-                await execa(editorCommand, [targetPath], { stdio: "inherit" });
+                const { command, args } = parseEditorCommand(editorCommand);
+                await execa(command, [...args, targetPath], { stdio: "inherit" });
                 console.log(chalk.green(`Successfully opened worktree in ${editorCommand}.`));
             } catch (editorError) {
                 console.error(chalk.red(`Failed to open editor "${editorCommand}". Please ensure it's installed and in your PATH.`));

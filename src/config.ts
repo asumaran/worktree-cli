@@ -11,7 +11,7 @@ const packageName = packageJson.name;
 
 // Define the structure of the configuration
 interface ConfigSchema {
-    defaultEditor: string;
+    defaultEditor?: string;
     gitProvider: 'gh' | 'glab';
     defaultWorktreePath?: string;
     herdrIntegration: boolean;
@@ -22,7 +22,7 @@ interface ConfigSchema {
 const schema = {
     defaultEditor: {
         type: 'string',
-        default: 'cursor', // Default editor is 'cursor'
+        // No default - falls back to $VISUAL/$EDITOR, then FALLBACK_EDITOR
     },
     gitProvider: {
         type: 'string',
@@ -53,7 +53,27 @@ const config = new Conf<ConfigSchema>({
     ...(configCwd ? { cwd: configCwd } : {}),
 });
 
-// Function to get the default editor
+// Last-resort editor when nothing is configured and no system editor is set
+const FALLBACK_EDITOR = 'cursor';
+
+// Derive an editor from the conventional $VISUAL/$EDITOR variables. Those are
+// meant for blocking, file-oriented use (git, crontab), so they often carry a
+// wait flag (e.g. "zed --wait"); wt opens a whole worktree and must not block
+// on the editor, so wait flags are dropped.
+function getSystemEditor(): string | undefined {
+    const raw = process.env.VISUAL || process.env.EDITOR;
+    if (!raw || raw.trim() === '') {
+        return undefined;
+    }
+    const tokens = raw
+        .trim()
+        .split(/\s+/)
+        .filter((token) => token !== '--wait' && token !== '-w');
+    return tokens.length > 0 ? tokens.join(' ') : undefined;
+}
+
+// Function to get the default editor.
+// Resolution order: WT_EDITOR > stored config > $VISUAL/$EDITOR > FALLBACK_EDITOR.
 export function getDefaultEditor(): string {
     // WT_EDITOR overrides the configured editor for a single invocation. Tests
     // set it to 'none' to avoid launching a real editor; it also works as an
@@ -62,12 +82,29 @@ export function getDefaultEditor(): string {
     if (envEditor && envEditor.trim() !== '') {
         return envEditor;
     }
-    return config.get('defaultEditor');
+    const configured = config.get('defaultEditor');
+    if (configured && configured.trim() !== '') {
+        return configured;
+    }
+    return getSystemEditor() ?? FALLBACK_EDITOR;
 }
 
 // Function to set the default editor
 export function setDefaultEditor(editor: string): void {
     config.set('defaultEditor', editor);
+}
+
+// Function to clear the default editor (revert to $VISUAL/$EDITOR resolution)
+export function clearDefaultEditor(): void {
+    config.delete('defaultEditor');
+}
+
+// Split an editor value into a binary plus argv. Editor values may carry
+// arguments (e.g. a $VISUAL/$EDITOR-derived "emacsclient -n" or a configured
+// "open -a TextEdit"), which execa must receive separately.
+export function parseEditorCommand(editor: string): { command: string; args: string[] } {
+    const [command, ...args] = editor.trim().split(/\s+/);
+    return { command, args };
 }
 
 // Function to get the git provider

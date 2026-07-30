@@ -1,7 +1,7 @@
 import { execa } from "execa";
 import chalk from "chalk";
 import { stat } from "node:fs/promises";
-import { getDefaultEditor, shouldSkipEditor } from "../config.js";
+import { getDefaultEditor, shouldSkipEditor, parseEditorCommand } from "../config.js";
 import {
     isWorktreeClean,
     isMainRepoBare,
@@ -163,7 +163,8 @@ export async function newWorktreeHandler(
         } else {
             console.log(chalk.blue(`Opening ${resolvedPath} in ${editorCommand}...`));
             try {
-                await execa(editorCommand, [resolvedPath], { stdio: "inherit" });
+                const { command, args } = parseEditorCommand(editorCommand);
+                await execa(command, [...args, resolvedPath], { stdio: "inherit" });
             } catch (editorError) {
                 console.error(chalk.red(`Failed to open editor "${editorCommand}". Please ensure it's installed and in your PATH.`));
                 console.warn(chalk.yellow(`Continuing without opening editor.`));

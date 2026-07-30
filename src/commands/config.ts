@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { getDefaultEditor, setDefaultEditor, getGitProvider, setGitProvider, getConfigPath, getDefaultWorktreePath, setDefaultWorktreePath, clearDefaultWorktreePath, isHerdrIntegrationEnabled, setHerdrIntegration } from '../config.js';
+import { getDefaultEditor, setDefaultEditor, clearDefaultEditor, getGitProvider, setGitProvider, getConfigPath, getDefaultWorktreePath, setDefaultWorktreePath, clearDefaultWorktreePath, isHerdrIntegrationEnabled, setHerdrIntegration } from '../config.js';
 
 export async function configHandler(action: 'get' | 'set' | 'path' | 'clear', key?: string, value?: string) {
     try {
@@ -77,9 +77,12 @@ export async function configHandler(action: 'get' | 'set' | 'path' | 'clear', ke
                 if (key === 'worktreepath') {
                     clearDefaultWorktreePath();
                     console.log(chalk.green(`Default worktree path cleared. Will now use sibling directory behavior.`));
+                } else if (key === 'editor') {
+                    clearDefaultEditor();
+                    console.log(chalk.green(`Default editor cleared. Will now use $VISUAL/$EDITOR (falling back to cursor).`));
                 } else {
                     console.error(chalk.red(`Unknown configuration key to clear: ${key}`));
-                    console.error(chalk.yellow(`Available keys: worktreepath`));
+                    console.error(chalk.yellow(`Available keys: editor, worktreepath`));
                     process.exit(1);
                 }
                 break;

@@ -2,7 +2,7 @@ import { execa } from "execa";
 import chalk from "chalk";
 import { stat } from "node:fs/promises";
 import { resolve, join } from "node:path";
-import { getDefaultEditor, shouldSkipEditor, getGitProvider } from "../config.js";
+import { getDefaultEditor, shouldSkipEditor, getGitProvider, parseEditorCommand } from "../config.js";
 import {
     isWorktreeClean,
     isMainRepoBare,
@@ -245,7 +245,8 @@ export async function prWorktreeHandler(
         } else {
             console.log(chalk.blue(`Opening ${resolvedPath} in ${editorCommand}...`));
             try {
-                await execa(editorCommand, [resolvedPath], { stdio: "ignore", detached: true });
+                const { command, args } = parseEditorCommand(editorCommand);
+                await execa(command, [...args, resolvedPath], { stdio: "ignore", detached: true });
             } catch (editorError) {
                 console.error(chalk.red(`Failed to open editor "${editorCommand}". Please ensure it's installed and in your PATH.`));
                 console.warn(chalk.yellow(`Worktree is ready at ${resolvedPath}. You can open it manually.`));

@@ -30,7 +30,7 @@ const program = new Command();
 
 program
   .name("wt")
-  .description("Manage git worktrees and open them in the Cursor editor.")
+  .description("Manage git worktrees and open them in your editor.")
   .version(packageJson.version);
 
 program
@@ -285,6 +285,11 @@ program
         new Command("worktreepath")
           .description("Clear the default worktree directory (revert to sibling behavior).")
           .action(() => configHandler("clear", "worktreepath"))
+      )
+      .addCommand(
+        new Command("editor")
+          .description("Clear the default editor (revert to $VISUAL/$EDITOR, then cursor).")
+          .action(() => configHandler("clear", "editor"))
       )
   )
   .addCommand(

@@ -2,7 +2,7 @@ import { execa } from "execa";
 import chalk from "chalk";
 import { stat } from "node:fs/promises";
 import { join } from "node:path";
-import { getDefaultEditor, shouldSkipEditor } from "../config.js";
+import { getDefaultEditor, shouldSkipEditor, parseEditorCommand } from "../config.js";
 import {
     isWorktreeClean,
     isMainRepoBare,
@@ -204,7 +204,8 @@ export async function openPathInEditor(
     console.log(chalk.blue(`Opening ${path} in ${editorCommand}...`));
 
     try {
-        await execa(editorCommand, [path], { stdio: "inherit" });
+        const { command, args } = parseEditorCommand(editorCommand);
+        await execa(command, [...args, path], { stdio: "inherit" });
     } catch (editorError) {
         console.error(
             chalk.red(`Failed to open editor "${editorCommand}". Please ensure it's installed and in your PATH.`)
