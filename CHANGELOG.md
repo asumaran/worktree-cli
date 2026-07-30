@@ -1,3 +1,8 @@
+## v1.6.0 (2026-07-30)
+
+* feat(config): fall back to $VISUAL/$EDITOR and support editor commands with args (4c5913c)
+* feat(setup): run setup scripts on wt new; wt setup re-provisions existing worktrees (9a3c90b)
+
 ## v1.5.0 (2026-07-10)
 
 * feat(remove): resolve worktrees by folder name (961bca8)
